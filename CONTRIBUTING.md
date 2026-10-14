@@ -7,14 +7,14 @@
 | 브랜치 | 용도 | 병합 대상 | 머지 방식 |
 |---|---|---|---|
 | `main` | 배포 버전. 직접 커밋 금지 | `dev` → `main` | **Fast-forward** (팀장이 반영) |
-| `dev` | 개발 통합 브랜치 (기본 브랜치) | `feature/*`, `fix/*` PR | **Squash and merge** |
-| `feature/#이슈번호-기능` | 기능 개발 | → `dev` | Squash |
-| `fix/#이슈번호-내용` | 버그 수정 | → `dev` | Squash |
-| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `dev` 후 즉시 main 반영 | Squash |
+| `dev` | 개발 통합 브랜치 (기본 브랜치) | `feature/*`, `fix/*` PR | **Rebase and merge** |
+| `feature/#이슈번호-기능` | 기능 개발 | → `dev` | Rebase |
+| `fix/#이슈번호-내용` | 버그 수정 | → `dev` | Rebase |
+| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `dev` 후 즉시 main 반영 | Rebase |
 
 브랜치별 규칙은 레포 룰셋으로 강제됩니다.
 
-- `dev-squash-only`: PR + 김예준·김어진 중 1명 승인 + Squash and merge만 허용
+- `dev-rebase-only`: PR + 김예준·김어진 중 1명 승인 + Rebase and merge만 허용
 - `main-fast-forward-only`: 관리자만 갱신 가능, 강제 푸시·삭제 금지, 선형 히스토리
 
 main과 dev는 **한 줄 히스토리**를 유지합니다. main은 항상 dev의 과거 지점과 같은 커밋입니다.
@@ -39,7 +39,7 @@ git push origin origin/dev:main
 3. TDD로 구현합니다. **Red → Green → Refactor 단계마다 커밋**합니다.
 4. `dev`로 PR을 열고 본문에 `close #이슈번호`를 적습니다.
 5. **김예준·김어진 중 1명 이상 Approve** 후 Merge합니다. (`.github/CODEOWNERS`로 강제, 본인 PR은 다른 한 명이 승인)
-6. `dev`로의 Merge는 **Squash and merge만** 사용합니다. (PR 하나 = `dev` 커밋 하나. TDD 단계 커밋은 PR 안에 남습니다)
+6. `dev`로의 Merge는 **Rebase and merge만** 사용합니다. (PR의 커밋이 그대로 `dev`에 올라갑니다. TDD 단계 커밋은 남기고, `수정`·`오타` 같은 의미 없는 커밋은 머지 전에 정리합니다)
 7. 충돌이 나거나 `dev`가 앞서 있으면 PR의 **Update branch 버튼은 쓰지 말고**(merge 커밋이 생김) 아래처럼 rebase로 최신화한 뒤 다시 푸시합니다. 혼자 어렵다면 디스코드에 공유합니다.
 
 ```bash
