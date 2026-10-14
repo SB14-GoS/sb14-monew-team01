@@ -1,5 +1,7 @@
 # 협업 규칙
 
+처음이라면 [온보딩 가이드](./docs/ONBOARDING.md)부터 읽으세요.
+
 ## 브랜치 전략
 
 | 브랜치 | 용도 | 병합 대상 | 머지 방식 |
@@ -112,6 +114,19 @@ global/                config · exception · common · web (도메인 로직 �
 ```
 
 환경 변수는 `.env.example`을 참고합니다.
+
+## 새 기능 체크리스트
+
+PR을 올리기 전에 확인합니다.
+
+- [ ] 요청·응답 DTO 이름과 필드가 [Swagger 명세](http://sprint-project-1196140422.ap-northeast-2.elb.amazonaws.com/sb/monew/api/swagger-ui/index.html)와 같다
+- [ ] 엔티티는 `BaseEntity` 또는 `BaseSoftDeleteEntity`를 상속한다
+- [ ] 다른 모듈은 `api` 패키지(공개 인터페이스·record·이벤트)로만 사용했다
+- [ ] 다른 모듈 엔티티는 연관관계 대신 ID로 참조했다
+- [ ] 논리 삭제 대상 조회에서 `deletedAt is null` 조건을 걸었다
+- [ ] 테스트를 Red → Green → Refactor 커밋으로 남겼다
+- [ ] `./gradlew build`가 로컬에서 통과한다
+- [ ] 첫 클래스를 만든 패키지의 `README.md`를 삭제했다
 
 ## 코드 컨벤션
 
