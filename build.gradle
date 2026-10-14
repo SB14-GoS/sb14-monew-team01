@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'com.diffplug.spotless' version '8.10.4'
 }
 
 group = 'com.sprint'
@@ -85,4 +86,29 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// ── 코드 포매터 ─────────────────────────────────────────────
+// ./gradlew spotlessApply 로 자동 정리 (pre-commit hook이 커밋 전에 실행)
+spotless {
+	java {
+		target 'src/**/*.java'
+		palantirJavaFormat('2.102.0')
+		importOrder()
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+}
+
+// ── Git hooks 자동 설치 ─────────────────────────────────────
+// 빌드할 때마다 core.hooksPath를 .githooks로 맞춰, clone 후 별도 설정이 필요 없게 한다.
+tasks.register('installGitHooks', Exec) {
+	description = '.githooks 디렉터리를 Git hooks 경로로 등록'
+	onlyIf { file('.git').exists() }
+	commandLine 'git', 'config', 'core.hooksPath', '.githooks'
+}
+
+tasks.named('compileJava') {
+	dependsOn 'installGitHooks'
 }

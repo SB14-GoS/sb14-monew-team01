@@ -4,8 +4,6 @@ spring:
   docker:
     compose:
       lifecycle-management: start-only   # 앱 종료 시 컨테이너는 유지
-# 로컬 개발: docker-compose(#2)로 띄운 PostgreSQL·MongoDB 사용
-spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/monew}
     username: ${DB_USERNAME:monew}

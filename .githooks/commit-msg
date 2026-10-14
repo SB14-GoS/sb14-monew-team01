@@ -1,0 +1,24 @@
+#!/bin/sh
+# 커밋 메시지 첫 줄 형식 검사: <type>: <요약> [#이슈번호]
+MSG_FILE="$1"
+FIRST=$(head -n1 "$MSG_FILE")
+
+# merge·revert·fixup 등 Git 자동 메시지는 통과
+echo "$FIRST" | grep -qE '^(Merge|Revert|fixup!|squash!)' && exit 0
+
+PATTERN='^(feat|fix|refactor|test|docs|chore|style|infra): .+'
+if ! echo "$FIRST" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "❌ 커밋 메시지 형식이 맞지 않습니다: \"$FIRST\""
+  echo ""
+  echo "   형식: <type>: <요약> #이슈번호"
+  echo "   type: feat | fix | refactor | test | docs | chore | style | infra"
+  echo "   예시: feat: 회원가입 이메일 중복 검사 #12"
+  echo ""
+  exit 1
+fi
+
+if ! echo "$FIRST" | grep -qE '#[0-9]+'; then
+  echo "⚠️  이슈 번호(#번호)가 없습니다. 가능하면 붙여 주세요."
+fi
+exit 0
