@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: monew
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+  batch:
+    job:
+      enabled: false   # 배치는 스케줄러에서 직접 실행
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
