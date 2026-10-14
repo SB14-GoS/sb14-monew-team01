@@ -1,0 +1,12 @@
+#!/bin/sh
+# 커밋 전 스테이징된 Java 파일을 자동 포맷하고 다시 스테이징한다.
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.java$')
+[ -z "$STAGED" ] && exit 0
+
+echo "[pre-commit] spotlessApply 실행 중..."
+./gradlew spotlessApply -q || { echo "[pre-commit] 포맷 실패. ./gradlew spotlessApply 로 확인하세요."; exit 1; }
+
+echo "$STAGED" | while IFS= read -r f; do
+  [ -f "$f" ] && git add "$f"
+done
+exit 0

@@ -26,64 +26,75 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class ArchitectureTest {
 
-	private static final String ROOT = "com.sprint.monew";
-	private static final List<String> MODULES =
-		List.of("user", "interest", "article", "comment", "notification", "activity", "backup");
-	private static final String[] INTERNAL_LAYERS = {"web", "application", "domain", "infra"};
+    private static final String ROOT = "com.sprint.monew";
+    private static final List<String> MODULES =
+            List.of("user", "interest", "article", "comment", "notification", "activity", "backup");
+    private static final String[] INTERNAL_LAYERS = {"web", "application", "domain", "infra"};
 
-	private static JavaClasses classes;
+    private static JavaClasses classes;
 
-	@BeforeAll
-	static void importClasses() {
-		classes = new ClassFileImporter()
-			.withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-			.importPackages(ROOT);
-	}
+    @BeforeAll
+    static void importClasses() {
+        classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages(ROOT);
+    }
 
-	static List<String> modules() {
-		return MODULES;
-	}
+    static List<String> modules() {
+        return MODULES;
+    }
 
-	@ParameterizedTest(name = "{0} 모듈은 다른 모듈의 내부 패키지에 의존하지 않는다")
-	@MethodSource("modules")
-	void moduleDependsOnlyOnOtherModulesApi(String module) {
-		String[] otherInternals = MODULES.stream()
-			.filter(other -> !other.equals(module))
-			.flatMap(other -> Arrays.stream(INTERNAL_LAYERS)
-				.map(layer -> ROOT + "." + other + "." + layer + ".."))
-			.toArray(String[]::new);
+    @ParameterizedTest(name = "{0} 모듈은 다른 모듈의 내부 패키지에 의존하지 않는다")
+    @MethodSource("modules")
+    void moduleDependsOnlyOnOtherModulesApi(String module) {
+        String[] otherInternals = MODULES.stream()
+                .filter(other -> !other.equals(module))
+                .flatMap(other -> Arrays.stream(INTERNAL_LAYERS).map(layer -> ROOT + "." + other + "." + layer + ".."))
+                .toArray(String[]::new);
 
-		noClasses().that().resideInAPackage(ROOT + "." + module + "..")
-			.should().dependOnClassesThat().resideInAnyPackage(otherInternals)
-			.allowEmptyShould(true)
-			.check(classes);
-	}
+        noClasses()
+                .that()
+                .resideInAPackage(ROOT + "." + module + "..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(otherInternals)
+                .allowEmptyShould(true)
+                .check(classes);
+    }
 
-	@Test
-	@DisplayName("domain은 web·application·infra에 의존하지 않는다")
-	void domainIsIndependent() {
-		noClasses().that().resideInAPackage(ROOT + ".*.domain..")
-			.should().dependOnClassesThat()
-			.resideInAnyPackage(ROOT + ".*.web..", ROOT + ".*.application..", ROOT + ".*.infra..")
-			.allowEmptyShould(true)
-			.check(classes);
-	}
+    @Test
+    @DisplayName("domain은 web·application·infra에 의존하지 않는다")
+    void domainIsIndependent() {
+        noClasses()
+                .that()
+                .resideInAPackage(ROOT + ".*.domain..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(ROOT + ".*.web..", ROOT + ".*.application..", ROOT + ".*.infra..")
+                .allowEmptyShould(true)
+                .check(classes);
+    }
 
-	@Test
-	@DisplayName("web은 infra에 직접 의존하지 않는다")
-	void webDoesNotUseInfra() {
-		noClasses().that().resideInAPackage(ROOT + ".*.web..")
-			.should().dependOnClassesThat().resideInAPackage(ROOT + ".*.infra..")
-			.allowEmptyShould(true)
-			.check(classes);
-	}
+    @Test
+    @DisplayName("web은 infra에 직접 의존하지 않는다")
+    void webDoesNotUseInfra() {
+        noClasses()
+                .that()
+                .resideInAPackage(ROOT + ".*.web..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage(ROOT + ".*.infra..")
+                .allowEmptyShould(true)
+                .check(classes);
+    }
 
-	@Test
-	@DisplayName("모듈 간 순환 의존이 없다")
-	void noCyclesBetweenModules() {
-		slices().matching(ROOT + ".(*)..")
-			.should().beFreeOfCycles()
-			.allowEmptyShould(true)
-			.check(classes);
-	}
+    @Test
+    @DisplayName("모듈 간 순환 의존이 없다")
+    void noCyclesBetweenModules() {
+        slices().matching(ROOT + ".(*)..")
+                .should()
+                .beFreeOfCycles()
+                .allowEmptyShould(true)
+                .check(classes);
+    }
 }
