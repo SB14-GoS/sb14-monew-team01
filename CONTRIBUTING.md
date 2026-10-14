@@ -2,13 +2,16 @@
 
 ## 브랜치 전략
 
-| 브랜치 | 용도 | 병합 대상 |
-|---|---|---|
-| `main` | 배포 버전. 직접 커밋 금지 | `dev` → `main` PR |
-| `dev` | 개발 통합 브랜치 (기본 브랜치) | `feature/*`, `fix/*` PR |
-| `feature/#이슈번호-기능` | 기능 개발 | → `dev` |
-| `fix/#이슈번호-내용` | 버그 수정 | → `dev` |
-| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `main` & `dev` |
+| 브랜치 | 용도 | 병합 대상 | 머지 방식 |
+|---|---|---|---|
+| `main` | 배포 버전. 직접 커밋 금지 | `dev` → `main` PR | **Squash and merge** (릴리스 단위 1커밋) |
+| `dev` | 개발 통합 브랜치 (기본 브랜치) | `feature/*`, `fix/*` PR | **Rebase and merge** |
+| `feature/#이슈번호-기능` | 기능 개발 | → `dev` | Rebase |
+| `fix/#이슈번호-내용` | 버그 수정 | → `dev` | Rebase |
+| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `main` (이후 `dev`에도 반영) | Squash |
+
+브랜치별 머지 방식은 레포 룰셋(`dev-rebase-only`, `main-squash-only`)으로 강제됩니다.
+`dev`가 원본입니다. main에 squash한 뒤 main을 dev로 역병합하지 않습니다.
 
 예: `feature/#12-user-signup`
 
@@ -19,7 +22,7 @@
 3. TDD로 구현합니다. **Red → Green → Refactor 단계마다 커밋**합니다.
 4. `dev`로 PR을 열고 본문에 `close #이슈번호`를 적습니다.
 5. **김예준·김어진 중 1명 이상 Approve** 후 Merge합니다. (`.github/CODEOWNERS`로 강제, 본인 PR은 다른 한 명이 승인)
-6. Merge는 **Rebase and merge만** 사용합니다. (Squash·Merge commit 비활성화, 선형 히스토리 강제)
+6. `dev`로의 Merge는 **Rebase and merge만** 사용합니다. (Merge commit 비활성화, 선형 히스토리 강제)
 7. 충돌이 나면 디스코드에 공유하고, 아래처럼 rebase로 해결한 뒤 다시 푸시합니다.
 
 ```bash
