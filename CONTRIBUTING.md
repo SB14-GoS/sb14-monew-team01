@@ -18,8 +18,18 @@
 2. 최신 `dev`에서 브랜치를 만듭니다.
 3. TDD로 구현합니다. **Red → Green → Refactor 단계마다 커밋**합니다.
 4. `dev`로 PR을 열고 본문에 `close #이슈번호`를 적습니다.
-5. **1명 이상 Approve** 후 Merge합니다. (페어 프로그래밍한 PR은 리뷰 생략 가능)
-6. 충돌이 나면 디스코드에 공유하고, 로컬에서 `dev`를 병합해 해결한 뒤 다시 푸시합니다.
+5. **김예준·김어진 중 1명 이상 Approve** 후 Merge합니다. (`.github/CODEOWNERS`로 강제, 본인 PR은 다른 한 명이 승인)
+6. Merge는 **Rebase and merge만** 사용합니다. (Squash·Merge commit 비활성화, 선형 히스토리 강제)
+7. 충돌이 나면 디스코드에 공유하고, 아래처럼 rebase로 해결한 뒤 다시 푸시합니다.
+
+```bash
+git fetch origin
+git rebase origin/dev
+# 충돌 해결 후
+git add .
+git rebase --continue
+git push --force-with-lease
+```
 
 ## 커밋 컨벤션
 
