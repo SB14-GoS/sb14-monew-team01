@@ -81,6 +81,38 @@ refactor: 회원가입 검증 로직 메서드 분리 #12        ← Refactor
 - 라벨: 유형(`feat` `fix` `chore` `test` `docs` `infra` `batch`) + 도메인(`domain:*`)
 - 마일스톤: M1 기반 세팅 → M2 핵심 API → M3 배치·백업·심화 → M4 배포·문서
 
+## 패키지 구조
+
+도메인 우선 + 경계 규칙 + 외부 연동만 포트/어댑터 (`com.sprint.monew`)
+
+```
+{모듈}/                 user · interest · article · comment · notification · activity · backup
+├── api/               다른 모듈에 공개하는 계약 (조회 인터페이스, DTO record, 이벤트)
+├── web/               Controller, Request/Response DTO, Swagger 문서 인터페이스
+├── application/       Service(유스케이스, 트랜잭션), 이벤트 핸들러, 배치
+│   └── port/          외부 연동 인터페이스 (article: 뉴스 출처, backup: 파일 저장소)
+├── domain/            Entity, 도메인 규칙, Repository
+└── infra/             QueryDSL 구현, 외부 API·S3 클라이언트
+global/                config · exception · common · web (도메인 로직 금지)
+```
+
+규칙 (`ArchitectureTest`가 빌드 때 검사합니다)
+
+- 다른 모듈은 **`api` 패키지만** 참조합니다. 다른 모듈의 Entity·Repository·Service 직접 사용 금지
+- 다른 모듈 Entity와 JPA 연관관계를 맺지 않고 **ID로만** 참조합니다.
+- `domain`은 `web`·`application`·`infra`에 의존하지 않습니다.
+- `web`은 `infra`를 직접 사용하지 않습니다.
+- 모듈 간 순환 의존 금지
+
+## 실행
+
+```bash
+./gradlew bootRun          # local 프로파일 (PostgreSQL·MongoDB 필요, #2 docker-compose)
+./gradlew test             # test 프로파일 (H2)
+```
+
+환경 변수는 `.env.example`을 참고합니다.
+
 ## 코드 컨벤션
 
 - 변수·메서드: camelCase / 클래스: PascalCase / 상수: UPPER_SNAKE_CASE

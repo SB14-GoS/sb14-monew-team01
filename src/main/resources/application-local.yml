@@ -1,0 +1,22 @@
+# 로컬 개발: docker-compose(#2)로 띄운 PostgreSQL·MongoDB 사용
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/monew}
+    username: ${DB_USERNAME:monew}
+    password: ${DB_PASSWORD:monew}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/monew}
+  batch:
+    jdbc:
+      initialize-schema: always
+
+logging:
+  level:
+    com.sprint.monew: debug

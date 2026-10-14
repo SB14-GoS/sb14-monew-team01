@@ -16,7 +16,7 @@
 
 ## 기술 스택
 
-- Backend: Java 17, Spring Boot 3, Spring Data JPA, QueryDSL, Spring Batch
+- Backend: Java 17, Spring Boot 4.1, Spring Data JPA, QueryDSL 7 (OpenFeign), Spring Batch
 - Database: PostgreSQL, MongoDB
 - Storage: AWS S3
 - Infra: AWS ECS, GitHub Actions

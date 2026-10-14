@@ -1,0 +1,85 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.1'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.sprint'
+version = '0.0.1-SNAPSHOT'
+description = 'MoNew - 다중 뉴스 API 통합 맞춤형 뉴스 & 소셜 서비스'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	querydslVersion = '7.7'
+	springdocVersion = '3.1.1'
+	awsSdkVersion = '2.55.16'
+	archunitVersion = '1.5.1'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "software.amazon.awssdk:bom:${awsSdkVersion}"
+	}
+}
+
+dependencies {
+	// Web · Validation
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// Persistence: PostgreSQL(JPA) + MongoDB
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+	runtimeOnly 'org.postgresql:postgresql'
+
+	// QueryDSL (OpenFeign fork, Hibernate 7 / Jakarta 호환)
+	implementation "io.github.openfeign.querydsl:querydsl-jpa:${querydslVersion}"
+	annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:${querydslVersion}:jpa"
+	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+	// Batch · Monitoring
+	implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// API 문서 (설정은 #9)
+	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+	// AWS S3 (백업 · 로그 적재)
+	implementation 'software.amazon.awssdk:s3'
+
+	// Lombok · Configuration Processor
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+	// Test
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-mongodb-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-batch-jdbc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+	testImplementation "com.tngtech.archunit:archunit-junit5:${archunitVersion}"
+	testRuntimeOnly 'com.h2database:h2'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// QueryDSL Q클래스는 기본 위치(build/generated/sources/annotationProcessor/java/main)에 생성됩니다.
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

@@ -1,0 +1,14 @@
+# 테스트: H2(PostgreSQL 모드). 실제 DB 기반 통합 테스트 환경은 #2에서 구성
+spring:
+  datasource:
+    url: jdbc:h2:mem:monew;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  mongodb:
+    uri: mongodb://localhost:27017/monew-test
+  batch:
+    jdbc:
+      initialize-schema: always
