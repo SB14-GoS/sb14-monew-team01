@@ -1,5 +1,13 @@
 # `com.sprint.monew.backup.application.port`
 
-[기사 백업·복구] 파일 저장소(S3) 아웃바운드 포트. 구현은 infra.
+외부 시스템을 감싸는 인터페이스만 둡니다. 구현은 같은 모듈의 `infra`에 둡니다. 테스트에서는 Fake 구현으로 대체합니다.
 
-> 패키지 골격 유지용 안내 파일입니다. 이 폴더에 첫 클래스를 추가하면 삭제하세요.
+## 추천 클래스·인터페이스
+
+| 이름 | 종류 | 역할 |
+|---|---|---|
+| `FileStorage` | interface | `put(String key, byte[] or InputStream)`, `get(String key)`, `list(String prefix)` |
+
+**관련 이슈**: [#40](https://github.com/SB14-GoS/sb14-monew-team01/issues/40) · [#41](https://github.com/SB14-GoS/sb14-monew-team01/issues/41) · [#46](https://github.com/SB14-GoS/sb14-monew-team01/issues/46)
+
+> 패키지 골격 유지용 안내 파일입니다. 이 폴더에 첫 클래스를 추가하면 삭제하세요. 클래스 이름은 추천이며 팀 합의로 바꿔도 됩니다.
