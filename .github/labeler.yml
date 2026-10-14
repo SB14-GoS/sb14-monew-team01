@@ -1,0 +1,45 @@
+# PR 자동 라벨: 브랜치 이름 → 유형, 변경 경로 → 도메인
+
+# ── 유형 (브랜치 접두사) ─────────────────────
+feat:
+  - head-branch: ['^feature/']
+fix:
+  - head-branch: ['^fix/', '^hotfix/']
+refactor:
+  - head-branch: ['^refactor/']
+test:
+  - head-branch: ['^test/']
+docs:
+  - head-branch: ['^docs/']
+chore:
+  - head-branch: ['^chore/']
+infra:
+  - head-branch: ['^infra/']
+  - changed-files:
+      - any-glob-to-any-file: ['.github/workflows/**', 'compose.yaml', 'Dockerfile']
+
+# ── 도메인 (변경 경로) ───────────────────────
+'domain:user':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/user/**']
+'domain:interest':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/interest/**']
+'domain:article':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/article/**']
+'domain:comment':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/comment/**']
+'domain:notification':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/notification/**']
+'domain:activity':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/activity/**']
+'domain:backup':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/backup/**']
+'domain:common':
+  - changed-files:
+      - any-glob-to-any-file: ['src/*/java/com/sprint/monew/global/**', 'build.gradle', 'src/*/resources/**']
