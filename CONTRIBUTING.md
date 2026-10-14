@@ -4,14 +4,29 @@
 
 | 브랜치 | 용도 | 병합 대상 | 머지 방식 |
 |---|---|---|---|
-| `main` | 배포 버전. 직접 커밋 금지 | `dev` → `main` PR | **Squash and merge** (릴리스 단위 1커밋) |
+| `main` | 배포 버전. 직접 커밋 금지 | `dev` → `main` | **Fast-forward** (팀장이 반영) |
 | `dev` | 개발 통합 브랜치 (기본 브랜치) | `feature/*`, `fix/*` PR | **Rebase and merge** |
 | `feature/#이슈번호-기능` | 기능 개발 | → `dev` | Rebase |
 | `fix/#이슈번호-내용` | 버그 수정 | → `dev` | Rebase |
-| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `main` (이후 `dev`에도 반영) | Squash |
+| `hotfix/#이슈번호-내용` | 배포 후 긴급 수정 | → `dev` 후 즉시 main 반영 | Rebase |
 
-브랜치별 머지 방식은 레포 룰셋(`dev-rebase-only`, `main-squash-only`)으로 강제됩니다.
-`dev`가 원본입니다. main에 squash한 뒤 main을 dev로 역병합하지 않습니다.
+브랜치별 규칙은 레포 룰셋으로 강제됩니다.
+
+- `dev-rebase-only`: PR + 김예준·김어진 중 1명 승인 + Rebase and merge만 허용
+- `main-fast-forward-only`: 관리자만 갱신 가능, 강제 푸시·삭제 금지, 선형 히스토리
+
+main과 dev는 **한 줄 히스토리**를 유지합니다. main은 항상 dev의 과거 지점과 같은 커밋입니다.
+
+### dev → main 반영 (릴리스)
+
+1. `dev` → `main` PR을 열어 변경 내용을 리뷰받습니다.
+2. 승인 후 **머지 버튼을 누르지 않고** 팀장이 fast-forward로 반영합니다. PR은 자동으로 Merged 처리됩니다.
+
+```bash
+git fetch origin
+git push origin origin/dev:main
+```
+
 
 예: `feature/#12-user-signup`
 
