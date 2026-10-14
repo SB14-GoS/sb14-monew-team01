@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:          # 모든 PR (스택 PR 포함)
+  push:
+    branches: [dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # 커버리지 코멘트
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # spotlessCheck + 컴파일 + 테스트(Testcontainers) + ArchitectureTest + JaCoCo 리포트
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Coverage comment
+        if: github.event_name == 'pull_request' && always()
+        uses: madrapps/jacoco-report@v1.8.0
+        with:
+          paths: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 80
+          min-coverage-changed-files: 80
+          title: 📊 테스트 커버리지
+          update-comment: true
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/test
+            build/reports/jacoco/test/html
+          retention-days: 7
