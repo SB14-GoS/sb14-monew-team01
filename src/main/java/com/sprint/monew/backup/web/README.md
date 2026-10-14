@@ -1,5 +1,13 @@
 # `com.sprint.monew.backup.web`
 
-[기사 백업·복구] 인바운드 어댑터: Controller, Request/Response DTO, Swagger 문서 인터페이스.
+HTTP 요청/응답 변환만 합니다. 비즈니스 로직과 Repository 직접 호출은 금지합니다. 응답 DTO 필드명은 Swagger 명세와 정확히 맞춥니다.
 
-> 패키지 골격 유지용 안내 파일입니다. 이 폴더에 첫 클래스를 추가하면 삭제하세요.
+## 추천 클래스·인터페이스
+
+| 이름 | 종류 | 역할 |
+|---|---|---|
+| `(비어 있어도 됨)` | - | 명세상 복구 엔드포인트는 ArticleController에 있습니다. backup 전용 API가 생기면 여기에 |
+
+**관련 이슈**: [#41](https://github.com/SB14-GoS/sb14-monew-team01/issues/41)
+
+> 패키지 골격 유지용 안내 파일입니다. 이 폴더에 첫 클래스를 추가하면 삭제하세요. 클래스 이름은 추천이며 팀 합의로 바꿔도 됩니다.
