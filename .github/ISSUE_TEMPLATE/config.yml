@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📰 모뉴 요구사항 (노션)
+    url: https://codeit.notion.site/MongoDB-PostgreSQL-v2-3276fd228e8d81c89265f6b5469efbb0
+    about: 기능·기술 요구사항 원문
+  - name: 📘 API 명세 (Swagger)
+    url: http://sprint-project-1196140422.ap-northeast-2.elb.amazonaws.com/sb/monew/api/swagger-ui/index.html
+    about: 프론트엔드와 맞춰야 하는 API 스펙
