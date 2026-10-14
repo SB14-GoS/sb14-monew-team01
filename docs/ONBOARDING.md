@@ -123,6 +123,8 @@ git push --force-with-lease      # 내 브랜치에만 사용. dev/main에는 �
 | 포트 5432·27017 사용 중 | 다른 프로젝트의 DB 컨테이너를 종료 (`docker ps`로 확인) |
 | 커밋이 `커밋 메시지 형식이 맞지 않습니다`로 거부됨 | 첫 줄을 `feat: 요약 #이슈번호` 형식으로 |
 | CI에서 `spotlessCheck` 실패 | `./gradlew spotlessApply` 후 커밋 |
+| push가 `[pre-push] Docker가 실행 중이 아닙니다`로 거부됨 | Docker Desktop을 켜고 다시 push |
+| push가 `[pre-push] 빌드 또는 테스트가 실패`로 거부됨 | `./gradlew build`로 원인 확인 후 수정 커밋 |
 | CI에서 `ArchitectureTest` 실패 | 다른 모듈의 `api` 패키지가 아닌 클래스를 참조한 것. 메시지에 나온 클래스를 `api`로 옮기거나 공개 인터페이스를 사용 |
 | IntelliJ에서 클래스가 빨간색 | Gradle 탭 → 🔄 Reload All Gradle Projects |
 | Java 버전 오류 | Project SDK와 Gradle JVM을 17로 |

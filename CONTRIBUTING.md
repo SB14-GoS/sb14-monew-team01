@@ -51,6 +51,18 @@ git rebase --continue
 git push --force-with-lease
 ```
 
+### Git hooks (자동 검사)
+
+빌드 한 번이면 `.githooks`가 자동 등록됩니다. 따로 설정할 필요가 없습니다.
+
+| hook | 시점 | 하는 일 |
+|---|---|---|
+| `pre-commit` | 커밋 전 | 스테이징된 Java 파일 자동 포맷 (`spotlessApply`) |
+| `commit-msg` | 커밋 시 | 커밋 메시지 형식 검사 |
+| `pre-push` | push 전 | `./gradlew build`(포맷 검사·컴파일·테스트) 실패 시 push 중단. **Docker 실행 필요**, 1~2분 소요 |
+
+급할 때만 `git push --no-verify`로 건너뛸 수 있습니다. 이 경우에도 PR CI는 그대로 검사합니다.
+
 ## 커밋 컨벤션
 
 ```
