@@ -56,6 +56,9 @@ dependencies {
 	// AWS S3 (백업 · 로그 적재)
 	implementation 'software.amazon.awssdk:s3'
 
+	// 로컬 실행 시 compose.yaml 자동 기동 (local 프로파일)
+	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
 	// Lombok · Configuration Processor
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

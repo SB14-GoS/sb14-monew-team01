@@ -1,0 +1,40 @@
+# 로컬 개발용 DB. ./gradlew bootRun 실행 시 spring-boot-docker-compose가 자동으로 띄웁니다.
+# 수동 실행: docker compose up -d
+services:
+  postgres:
+    image: postgres:17
+    container_name: monew-postgres
+    environment:
+      POSTGRES_DB: monew
+      POSTGRES_USER: monew
+      POSTGRES_PASSWORD: monew
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - monew-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monew -d monew"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongodb:
+    image: mongo:8.2   # mongo:8(8.0)은 Docker Desktop 최신 커널(6.19+)에서 기동 불가
+    container_name: monew-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: monew
+      TZ: Asia/Seoul
+    ports:
+      - "27017:27017"
+    volumes:
+      - monew-mongodb:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  monew-postgres:
+  monew-mongodb:
