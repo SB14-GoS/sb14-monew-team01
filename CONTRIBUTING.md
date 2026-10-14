@@ -107,8 +107,8 @@ global/                config · exception · common · web (도메인 로직 �
 ## 실행
 
 ```bash
-./gradlew bootRun          # local 프로파일 (PostgreSQL·MongoDB 필요, #2 docker-compose)
-./gradlew test             # test 프로파일 (H2)
+./gradlew bootRun          # local 프로파일, compose.yaml의 DB 자동 기동 (Docker 필요)
+./gradlew test             # Testcontainers로 PostgreSQL·MongoDB 자동 기동 (Docker 필요)
 ```
 
 환경 변수는 `.env.example`을 참고합니다.
