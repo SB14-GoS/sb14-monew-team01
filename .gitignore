@@ -19,8 +19,8 @@ Thumbs.db
 
 # Env / secrets
 .env
-.env.*
-!.env.example
+.env
+!.env
 *.pem
 
 # Logs
