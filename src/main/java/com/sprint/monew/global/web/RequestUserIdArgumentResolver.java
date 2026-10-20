@@ -1,5 +1,7 @@
 package com.sprint.monew.global.web;
 
+import static com.sprint.monew.global.web.RequestTraceConstants.USER_ID_HEADER;
+
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.MethodParameter;
@@ -14,7 +16,6 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
 public class RequestUserIdArgumentResolver implements HandlerMethodArgumentResolver {
-    private static final String USER_ID_HEADER = "Monew-Request-User-ID";
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
