@@ -1,13 +1,14 @@
 package com.sprint.monew.global.web;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
@@ -31,23 +32,20 @@ public class RequestUserIdArgumentResolver implements HandlerMethodArgumentResol
     public Object resolveArgument(
             @NonNull MethodParameter parameter,
             ModelAndViewContainer mavContainer,
-            NativeWebRequest webRequest,
+            @NonNull NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory)
             throws Exception {
-        // 요청 객체 가져오기
-        HttpServletRequest request = (HttpServletRequest) webRequest.getNativeRequest();
-
         // 인증 정보 추출
-        String userIDStr = request.getHeader(USER_ID_HEADER);
+        String userIdValue = webRequest.getHeader(USER_ID_HEADER);
 
-        if (!StringUtils.hasText(userIDStr)) {
-            throw new IllegalArgumentException("필수 요청 헤더 누락: " + USER_ID_HEADER);
+        if (!StringUtils.hasText(userIdValue)) {
+            throw new MissingRequestHeaderException(USER_ID_HEADER, parameter);
         }
 
         try {
-            return UUID.fromString(userIDStr);
+            return UUID.fromString(userIdValue);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("유효하지 않은 UUID 형식입니다: " + USER_ID_HEADER);
+            throw new MethodArgumentTypeMismatchException(userIdValue, UUID.class, USER_ID_HEADER, parameter, e);
         }
     }
 }
