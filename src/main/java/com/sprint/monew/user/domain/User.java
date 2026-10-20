@@ -17,16 +17,16 @@ public class User extends BaseSoftDeleteEntity {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 20)
     private String nickname;
 
     @Column(nullable = false, length = 100)
     private String password;
 
-    public User(String email, String nickname, String password) {
+    public User(String email, String nickname, String encodedPassword) {
         this.email = email;
         this.nickname = nickname;
-        this.password = password;
+        this.password = encodedPassword;
     }
 
     public void updateNickname(String nickname) {
