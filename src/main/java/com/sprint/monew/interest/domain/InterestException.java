@@ -1,4 +1,4 @@
-package com.sprint.monew.global.exception.interest;
+package com.sprint.monew.interest.domain;
 
 import com.sprint.monew.global.exception.ErrorCode;
 import com.sprint.monew.global.exception.MonewException;

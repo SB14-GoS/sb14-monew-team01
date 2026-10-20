@@ -1,12 +1,12 @@
-package com.sprint.monew.global.exception.user;
+package com.sprint.monew.comment.domain;
 
 import com.sprint.monew.global.exception.ErrorCode;
 import com.sprint.monew.global.exception.MonewException;
 import java.util.Map;
 
-public class UserException extends MonewException {
+public class CommentException extends MonewException {
 
-    public UserException(ErrorCode errorCode, Map<String, Object> details) {
+    public CommentException(ErrorCode errorCode, Map<String, Object> details) {
         super(errorCode, details);
     }
 }

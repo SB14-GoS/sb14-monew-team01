@@ -1,4 +1,4 @@
-package com.sprint.monew.global.exception.notification;
+package com.sprint.monew.notification.domain;
 
 import com.sprint.monew.global.exception.ErrorCode;
 import com.sprint.monew.global.exception.MonewException;

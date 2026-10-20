@@ -57,10 +57,10 @@ public enum UserErrorCode implements ErrorCode {
 
 ### 1-2. 제공된 도메인 부모 확인하기
 
-`com.sprint.monew.global.exception.user.UserException`은 이미 준비되어 있습니다.
+`com.sprint.monew.user.domain.UserException`은 이미 준비되어 있습니다.
 
 ```java
-package com.sprint.monew.global.exception.user;
+package com.sprint.monew.user.domain;
 
 import com.sprint.monew.global.exception.ErrorCode;
 import com.sprint.monew.global.exception.MonewException;
@@ -83,7 +83,6 @@ public class UserException extends MonewException {
 ```java
 package com.sprint.monew.user.domain;
 
-import com.sprint.monew.global.exception.user.UserException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -157,14 +156,14 @@ return userRepository.findById(userId)
 | 세부 예외마다 별도 핸들러 추가 | 필요 없음. `MonewException` 핸들러가 처리 |
 | 기존 공통 부모를 서비스에서 직접 생성 | 팀의 사용 방식은 오류 상황별 세부 예외를 던지는 것으로 통일 |
 
-각 담당자가 추가할 파일은 **도메인 오류 코드 enum과 오류 상황별 세부 예외 클래스**입니다. 사용자 외 도메인도 3절의 기사 예시와 같은 방식으로 작성합니다.
+도메인 오류 코드 enum은 이미 준비되어 있습니다. 각 담당자는 **기존 enum에 필요한 오류 상수를 추가하고, 오류 상황별 세부 예외 클래스를 작성**합니다. 사용자 외 도메인도 3절의 기사 예시와 같은 방식으로 작성합니다.
 
 ## 2. 각 클래스의 역할
 
 | 구성 | 역할 |
 |---|---|
 | `ErrorCode` | 모든 오류 코드가 제공할 상태·메시지·로그 레벨을 정한 인터페이스 |
-| `CommonErrorCode` | 공통 입력 오류와 서버 오류를 정의한 enum |
+| `CommonErrorCode` | 공통 입력 오류·리소스 없음·메서드 오류·서버 오류를 정의한 enum |
 | `UserErrorCode` 등 도메인 enum | 담당 도메인의 오류 목록과 응답 정보를 정의. `ErrorCode` 구현 |
 | `MonewException` | 오류 코드, 추가 정보, 발생 시각을 보관하는 공통 예외 |
 | `UserException` 등 도메인 부모 예외 | `MonewException`을 상속하며 해당 도메인의 하위 예외가 사용할 공통 부모 |
@@ -182,13 +181,36 @@ public interface ErrorCode {
 }
 ```
 
-`HttpStatus`는 `org.springframework.http.HttpStatus`, `Level`은 `org.slf4j.event.Level`입니다. 핸들러는 `getStatus().value()`로 상태 코드를 숫자로 바꿔 응답 본문에 넣습니다. 로그 레벨은 서버 로그에 사용하며 응답 필드에는 포함하지 않습니다.
+`HttpStatus`는 `org.springframework.http.HttpStatus`, `Level`은 `org.slf4j.event.Level`입니다. 핸들러는 `getStatus().value()`로 상태 코드를 숫자로 바꿔 응답 본문에 넣습니다. 로그 레벨은 서버 로그에 사용하며 응답 필드에는 포함하지 않습니다. 도메인 enum에서는 4xx에 `WARN`, 5xx에 `ERROR`를 지정합니다. 공통 핸들러는 도메인 예외의 스택 트레이스를 5xx일 때만 남깁니다.
+
+공통 패키지는 특정 도메인의 예외 클래스를 참조하지 않습니다. 도메인 부모·세부 예외·오류 코드 enum은 각 모듈의 `domain` 패키지에 함께 둡니다.
+
+```text
+global/exception/   ErrorCode, CommonErrorCode, MonewException, ErrorResponse
+                    advice/GlobalExceptionHandler
+user/domain/        UserErrorCode, UserException, UserNotFoundException(담당자가 추가)
+article/domain/     ArticleErrorCode, ArticleException, ArticleNotFoundException(담당자가 추가)
+```
+
+새 모듈에 부모 예외가 필요하면 해당 모듈에서 `MonewException`을 상속해 추가합니다. 공통 패키지에 도메인별 예외를 추가할 필요는 없습니다.
 
 ## 3. 새 도메인 오류 코드 추가하기
 
-각 모듈의 `domain` 패키지에 `ErrorCode`를 구현하는 enum을 추가합니다. 현재 구현된 사용자 오류 코드는 [UserErrorCode.java](../../user/domain/UserErrorCode.java)를 참고하세요.
+각 모듈의 `domain` 패키지에 `ErrorCode`를 구현하는 enum이 준비되어 있습니다. 아래 enum에 해당 도메인의 오류 상수를 추가합니다.
 
-다음은 기사 담당자가 `ArticleErrorCode`를 새로 추가할 때의 예시입니다.
+| 도메인 | 오류 코드 enum | 준비된 오류 상수 |
+|---|---|---|
+| 사용자 | [UserErrorCode](../../user/domain/UserErrorCode.java) | `USER_NOT_FOUND` |
+| 기사 | [ArticleErrorCode](../../article/domain/ArticleErrorCode.java) | `ARTICLE_NOT_FOUND` |
+| 댓글 | [CommentErrorCode](../../comment/domain/CommentErrorCode.java) | `COMMENT_NOT_FOUND`, `NOT_COMMENT_OWNER`, `ALREADY_LIKED` |
+| 관심사 | [InterestErrorCode](../../interest/domain/InterestErrorCode.java) | `SIMILAR_NAME_EXISTS`, `INTEREST_NOT_FOUND`, `ALREADY_SUBSCRIBED` |
+| 알림 | [NotificationErrorCode](../../notification/domain/NotificationErrorCode.java) | `NOTIFICATION_NOT_FOUND` |
+| 활동 내역 | [ActivityErrorCode](../../activity/domain/ActivityErrorCode.java) | `ACTIVITY_NOT_FOUND` |
+| 백업 | [BackupErrorCode](../../backup/domain/BackupErrorCode.java) | `BACKUP_NOT_FOUND`, `RESTORE_FAILED` |
+
+조회 실패는 `404 NOT_FOUND`, 작성자 권한 오류는 `403 FORBIDDEN`, 중복은 `409 CONFLICT`를 사용합니다. 복원 실패인 `RESTORE_FAILED`는 `500 INTERNAL_SERVER_ERROR`와 `ERROR` 로그 레벨을 사용하며, 나머지 준비된 오류는 `WARN`입니다.
+
+현재 기사 오류 코드의 구현은 다음과 같습니다.
 
 ```java
 package com.sprint.monew.article.domain;
@@ -215,7 +237,6 @@ public enum ArticleErrorCode implements ErrorCode {
 ```java
 package com.sprint.monew.article.domain;
 
-import com.sprint.monew.global.exception.article.ArticleException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -246,12 +267,12 @@ throw new ArticleNotFoundException(articleId);
 
 | 도메인 | 예외 클래스 | 패키지 |
 |---|---|---|
-| 사용자 | `UserException` | `com.sprint.monew.global.exception.user` |
-| 기사 | `ArticleException` | `com.sprint.monew.global.exception.article` |
-| 댓글 | `CommentException` | `com.sprint.monew.global.exception.comment` |
-| 관심사 | `InterestException` | `com.sprint.monew.global.exception.interest` |
-| 알림 | `NotificationException` | `com.sprint.monew.global.exception.notification` |
-| 활동 내역 | `ActivityException` | `com.sprint.monew.global.exception.activity` |
+| 사용자 | `UserException` | `com.sprint.monew.user.domain` |
+| 기사 | `ArticleException` | `com.sprint.monew.article.domain` |
+| 댓글 | `CommentException` | `com.sprint.monew.comment.domain` |
+| 관심사 | `InterestException` | `com.sprint.monew.interest.domain` |
+| 알림 | `NotificationException` | `com.sprint.monew.notification.domain` |
+| 활동 내역 | `ActivityException` | `com.sprint.monew.activity.domain` |
 
 새 오류를 추가할 때는 다음 순서로 작성합니다.
 
@@ -270,9 +291,24 @@ throw new ArticleNotFoundException(articleId);
 | `HttpMessageNotReadableException` | 잘못된 JSON, 필수 요청 본문 누락 등 | 400 | `INCORRECT_REQUEST` |
 | `MethodArgumentTypeMismatchException` | UUID가 필요한 경로 변수에 `abc`를 전달하는 등 타입 변환 실패 | 400 | `INCORRECT_REQUEST` |
 | `MethodArgumentNotValidException` | DTO 바인딩 과정에서 `@Valid` 검증 실패 | 400 | `INCORRECT_REQUEST` |
-| 위 핸들러에 해당하지 않는 `Exception` | 별도 처리되지 않은 예외 | 500 | `INTERNAL_SERVER_ERROR` |
+| `MissingServletRequestParameterException` | 필수 쿼리 파라미터 누락 | 400 | `INCORRECT_REQUEST` |
+| `MissingRequestHeaderException` | 필수 요청 헤더 누락 | 400 | `INCORRECT_REQUEST` |
+| `HandlerMethodValidationException` | 요청 파라미터의 `@Min` 등 검증 실패 | 400 | `INCORRECT_REQUEST` |
+| `NoResourceFoundException`, `NoHandlerFoundException` | 존재하지 않는 리소스·경로 | 404 | `RESOURCE_NOT_FOUND` |
+| `HttpRequestMethodNotSupportedException` | 매핑에서 지원하지 않는 HTTP 메서드 | 405 | `METHOD_NOT_ALLOWED` |
+| 그 밖의 Spring `ErrorResponse` 4xx 예외 | 지원하지 않는 Content-Type 등 | Spring 예외가 지정한 상태 유지. 예: 415 | `INCORRECT_REQUEST` |
+| Spring `ErrorResponse` 5xx 예외 | 응답 값 검증 실패, 명시적인 서비스 불가 응답 등 | Spring 예외가 지정한 상태 유지. 예: 500·503 | `INTERNAL_SERVER_ERROR` |
+| 위 처리에 해당하지 않는 `Exception` | 별도 상태 정보가 없는 예상하지 못한 예외 | 500 | `INTERNAL_SERVER_ERROR` |
 
 Spring은 메서드 작성 순서가 아니라 발생한 예외 타입에 맞는 핸들러를 선택합니다. `UserNotFoundException → UserException → MonewException`처럼 여러 단계로 상속해도 첫 번째 처리에 포함되므로 구체적인 예외마다 별도 핸들러를 추가할 필요가 없습니다.
+
+### Spring 기본 예외의 상태와 헤더 유지
+
+Spring MVC의 기본 예외 중 `org.springframework.web.ErrorResponse`를 구현하는 예외는 `getStatusCode()`와 `getHeaders()`로 상태 코드와 응답 헤더를 제공합니다. 마지막 핸들러는 이 정보를 읽어 응답에 반영합니다. 프로젝트의 `ErrorResponse` record와 이름이 같으므로 Spring 인터페이스는 전체 패키지 이름으로 구분합니다.
+
+404는 `RESOURCE_NOT_FOUND`, 405는 `METHOD_NOT_ALLOWED`, 그 밖의 4xx는 `INCORRECT_REQUEST`로 응답하며 **HTTP 상태와 JSON의 `status`는 Spring 예외의 원래 값을 유지**합니다. 405의 `Allow`처럼 Spring이 제공하는 응답 헤더도 유지합니다.
+
+Spring의 4xx는 `WARN` 한 줄로 기록하고 스택 트레이스를 붙이지 않습니다. 5xx는 `ERROR`와 스택 트레이스를 남깁니다. `HandlerMethodValidationException`도 입력값 검증 실패라면 400이지만, 컨트롤러 응답 값 검증 실패라면 500입니다. 예외 타입만 보고 모두 400으로 바꾸지 않습니다.
 
 ### 요청 형식 오류와 검증 오류의 차이
 
@@ -312,7 +348,7 @@ Spring은 메서드 작성 순서가 아니라 발생한 예외 타입에 맞는
 
 Java 필드는 `Instant timestamp`입니다. `Instant`는 시간 타입이고, `timestamp`는 JSON에 표시할 필드 이름입니다.
 
-예상하지 못한 예외는 서버 로그에 원인과 스택 트레이스를 남깁니다. 응답의 `message`에는 `예상하지 못한 서버 오류가 발생했습니다.`라는 공통 메시지를 사용합니다.
+5xx 서버 오류는 서버 로그에 원인과 스택 트레이스를 남깁니다. 응답의 `message`에는 `예상하지 못한 서버 오류가 발생했습니다.`라는 공통 메시지를 사용합니다.
 
 도메인에서 예상한 조회 실패 등은 해당 도메인 예외로 던집니다. 일반 `IllegalArgumentException`이나 `NoSuchElementException`을 직접 던지면 현재 구성에서는 마지막 핸들러가 500으로 처리합니다.
 
@@ -321,7 +357,20 @@ Java 필드는 `Instant timestamp`입니다. `Instant`는 시간 타입이고, `
 1. 도메인 예외가 지정한 HTTP 상태와 JSON 응답을 만드는지 확인합니다.
 2. 잘못된 JSON·UUID 요청이 400으로 응답하는지 확인합니다.
 3. `@Valid` 검증 실패가 400과 필드별 `details`를 반환하는지 확인합니다.
-4. 예상하지 못한 예외가 500과 공통 메시지를 반환하는지 확인합니다.
+4. 필수 쿼리 파라미터·헤더 누락과 요청 파라미터 검증 실패가 400인지 확인합니다.
+5. 없는 경로는 404, 지원하지 않는 HTTP 메서드는 405인지 확인합니다. 405의 `Allow` 헤더도 확인합니다.
+6. 지원하지 않는 Content-Type 등 다른 Spring 예외도 원래 상태와 헤더를 유지하는지 확인합니다.
+7. 4xx 로그에는 스택 트레이스가 없고, 5xx 로그에는 스택 트레이스가 있는지 확인합니다.
+8. 예상하지 못한 예외는 500, 상태가 지정된 Spring 서버 예외는 지정된 5xx와 공통 메시지를 반환하는지 확인합니다.
+
+DB와 Docker 없이 예외 처리·모듈 경계·기존 화면 경로 테스트를 실행하려면 다음 명령을 사용합니다.
+
+```bash
+./gradlew test \
+  --tests com.sprint.monew.global.exception.advice.GlobalExceptionHandlerTest \
+  --tests com.sprint.monew.architecture.ArchitectureTest \
+  --tests com.sprint.monew.global.web.SpaForwardControllerTest
+```
 
 코드 자동 정리와 전체 빌드는 다음 명령으로 실행합니다.
 
