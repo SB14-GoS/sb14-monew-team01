@@ -24,3 +24,6 @@ management:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"
+
+springdoc:
+  paths-to-match: /api/**
