@@ -27,6 +27,7 @@
 - [요구사항](https://codeit.notion.site/MongoDB-PostgreSQL-v2-3276fd228e8d81c89265f6b5469efbb0)
 - [API 명세 (Swagger)](http://sprint-project-1196140422.ap-northeast-2.elb.amazonaws.com/sb/monew/api/swagger-ui/index.html)
 - [온보딩 가이드](./docs/ONBOARDING.md)
+- [공통 예외 처리 사용 가이드](src/main/java/com/sprint/monew/global/exception/EXCEPTION_HANDLING.md)
 - [협업 규칙](./CONTRIBUTING.md)
 
 > 기능 상세, 파일 구조, 배포 링크, 커버리지 배지는 개발 진행에 맞춰 추가합니다. (#50)
