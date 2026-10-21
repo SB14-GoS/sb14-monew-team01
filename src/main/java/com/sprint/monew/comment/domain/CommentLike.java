@@ -28,10 +28,10 @@ public class CommentLike extends BaseEntity {
     @JoinColumn(name = "comment_id", nullable = false)
     private Comment comment;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(nullable = false)
+    @Column(name = "article_id", nullable = false)
     private UUID articleId;
 
     public CommentLike(Comment comment, UUID userId, UUID articleId) {
