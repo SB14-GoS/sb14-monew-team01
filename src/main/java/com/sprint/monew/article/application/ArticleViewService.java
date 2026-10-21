@@ -37,10 +37,12 @@ public class ArticleViewService {
 
         ArticleView articleView = articleViewRepository.save(ArticleView.create(article, userId));
         articleRepository.increaseViewCount(articleId);
-        long viewCount = article.getViewCount() + 1;
+        Article updatedArticle =
+                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
+        long viewCount = updatedArticle.getViewCount();
 
-        eventPublisher.publishEvent(toEvent(articleView, article, viewCount));
-        return ArticleViewDto.from(articleView, article, viewCount);
+        eventPublisher.publishEvent(toEvent(articleView, updatedArticle, viewCount));
+        return ArticleViewDto.from(articleView, updatedArticle, viewCount);
     }
 
     private ArticleViewedEvent toEvent(ArticleView view, Article article, long viewCount) {
