@@ -10,22 +10,23 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Getter
 @Entity
 @Table(name = "subscriptions", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "interest_id"}))
-@FieldDefaults(level = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class Subscription extends BaseEntity {
     @Column(name = "user_id", nullable = false)
-    UUID userId;
+    private UUID userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interest_id", nullable = false)
-    Interest interest;
+    private Interest interest;
+
+    public Subscription(UUID userId, Interest interest) {
+        this.userId = userId;
+        this.interest = interest;
+    }
 }
