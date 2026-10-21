@@ -83,14 +83,15 @@ public class UserException extends MonewException {
 ```java
 package com.sprint.monew.user.domain;
 
+import com.sprint.monew.global.exception.MonewException;
 import java.util.Map;
 import java.util.UUID;
 
-public class UserNotFoundException extends UserException {
+public class UserNotFoundException extends MonewException {
 
-    public UserNotFoundException(UUID userId) {
-        super(UserErrorCode.USER_NOT_FOUND, Map.of("userId", userId));
-    }
+  public UserNotFoundException(UUID userId) {
+    super(UserErrorCode.USER_NOT_FOUND, Map.of("userId", userId));
+  }
 }
 ```
 
@@ -237,14 +238,15 @@ public enum ArticleErrorCode implements ErrorCode {
 ```java
 package com.sprint.monew.article.domain;
 
+import com.sprint.monew.global.exception.MonewException;
 import java.util.Map;
 import java.util.UUID;
 
-public class ArticleNotFoundException extends ArticleException {
+public class ArticleNotFoundException extends MonewException {
 
-    public ArticleNotFoundException(UUID articleId) {
-        super(ArticleErrorCode.ARTICLE_NOT_FOUND, Map.of("articleId", articleId));
-    }
+  public ArticleNotFoundException(UUID articleId) {
+    super(ArticleErrorCode.ARTICLE_NOT_FOUND, Map.of("articleId", articleId));
+  }
 }
 ```
 

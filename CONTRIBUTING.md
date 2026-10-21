@@ -112,7 +112,7 @@ global/                config · exception · common · web (도메인 로직 �
 
 규칙 (`ArchitectureTest`가 빌드 때 검사합니다)
 
-- 다른 모듈은 **`api` 패키지만** 참조합니다. 다른 모듈의 Entity·Repository·Service 직접 사용 금지
+- 다른 모듈은 **`api` 패키지만** 참조합니다. 다른 모듈의 Entity·Repository·Service 직접 사용 금지1
 - 다른 모듈 Entity와 JPA 연관관계를 맺지 않고 **ID로만** 참조합니다.
 - `domain`은 `web`·`application`·`infra`에 의존하지 않습니다.
 - `web`은 `infra`를 직접 사용하지 않습니다.

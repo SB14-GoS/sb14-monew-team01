@@ -10,12 +10,14 @@ import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "comment")
 @NoArgsConstructor
+@AllArgsConstructor
 @Getter
 public class Comment extends BaseSoftDeleteEntity {
 

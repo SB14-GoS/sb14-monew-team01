@@ -31,8 +31,12 @@ public class CommentLike extends BaseEntity {
     @Column(nullable = false)
     private UUID userId;
 
-    public CommentLike(Comment comment, UUID userId) {
+    @Column(nullable = false)
+    private UUID articleId;
+
+    public CommentLike(Comment comment, UUID userId, UUID articleId) {
         this.comment = comment;
         this.userId = userId;
+        this.articleId = articleId;
     }
 }
