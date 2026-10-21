@@ -11,23 +11,21 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Getter
 @Entity
 @Table(name = "interests")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class Interest extends BaseEntity {
 
     @Column(name = "name", nullable = false, unique = true)
-    String name;
+    private String name;
 
     @Column(name = "subscriber_count", nullable = false)
-    long subscriberCount = 0L;
+    private long subscriberCount = 0L;
 
     @OneToMany(mappedBy = "interest", cascade = CascadeType.ALL, orphanRemoval = true)
-    List<InterestKeyword> keywords = new ArrayList<>();
+    private List<InterestKeyword> keywords = new ArrayList<>();
 
     public Interest(String name, List<String> keywords) {
         this.name = name;
