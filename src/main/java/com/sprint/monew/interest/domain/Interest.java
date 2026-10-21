@@ -40,16 +40,6 @@ public class Interest extends BaseEntity {
         }
     }
 
-    public void increaseSubscriberCount() {
-        this.subscriberCount++;
-    }
-
-    public void decreaseSubscriberCount() {
-        if (this.subscriberCount > 0) {
-            this.subscriberCount--;
-        }
-    }
-
     public List<String> getKeywordStrings() {
         return this.keywords.stream().map(InterestKeyword::getKeyword).toList();
     }
