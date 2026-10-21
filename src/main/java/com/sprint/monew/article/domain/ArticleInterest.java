@@ -14,7 +14,6 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
@@ -26,15 +25,14 @@ import lombok.experimental.FieldDefaults;
                         name = "uk_article_interest",
                         columnNames = {"article_id", "interest_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class ArticleInterest extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "article_id", nullable = false)
-    Article article;
+    private Article article;
 
     @Column(name = "interest_id", nullable = false)
-    UUID interestId;
+    private UUID interestId;
 
     private ArticleInterest(Article article, UUID interestId) {
         if (article == null) {
