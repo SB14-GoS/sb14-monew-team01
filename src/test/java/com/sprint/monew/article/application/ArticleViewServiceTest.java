@@ -27,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ArticleViewServiceTest {
@@ -77,7 +78,9 @@ class ArticleViewServiceTest {
     @DisplayName("처음 본 기사면 기록을 저장하고 조회수를 올린 뒤 이벤트를 발행한다")
     void registersFirstView() {
         Article article = article();
-        given(articleRepository.findById(articleId)).willReturn(Optional.of(article));
+        Article updated = article();
+        ReflectionTestUtils.setField(updated, "viewCount", 1L); // DB에서 증가된 뒤 다시 읽은 상태
+        given(articleRepository.findById(articleId)).willReturn(Optional.of(article), Optional.of(updated));
         given(articleViewRepository.findByArticleIdAndUserId(articleId, userId)).willReturn(Optional.empty());
         given(articleViewRepository.save(any(ArticleView.class))).willAnswer(invocation -> invocation.getArgument(0));
 
