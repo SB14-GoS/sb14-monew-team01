@@ -25,7 +25,7 @@ public class Comment extends BaseSoftDeleteEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 500)
     private String content;
 
     @Column(nullable = false)
