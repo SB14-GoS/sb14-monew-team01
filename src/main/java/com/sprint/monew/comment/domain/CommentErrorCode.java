@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum CommentErrorCode implements ErrorCode {
-    EXAMPLE(null, null, null);
+    ARTICLE_NOT_FOUND(Level.WARN, HttpStatus.NOT_FOUND, "기사를 찾을 수 없습니다.");
 
     private final Level level;
     private final HttpStatus status;
