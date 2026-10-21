@@ -33,7 +33,7 @@ public class Comment extends BaseSoftDeleteEntity {
 
     @OneToMany(
             mappedBy = "comment",
-            cascade = {CascadeType.REMOVE},
+            cascade = {CascadeType.ALL},
             fetch = FetchType.LAZY)
     private List<CommentLike> commentLike = new ArrayList<>();
 
