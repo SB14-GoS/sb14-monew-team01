@@ -11,47 +11,45 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Getter
 @Entity
 @Table(name = "notifications")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class Notification extends BaseEntity {
     @Column(name = "user_id", nullable = false)
-    UUID userId;
+    private UUID userId;
 
     @Column(name = "content", nullable = false)
-    String content;
+    private String content;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "resource_type", nullable = false)
-    ResourceType resourceType;
+    private ResourceType resourceType;
 
     @Column(name = "resource_id", nullable = false)
-    UUID resourceId;
+    private UUID resourceId;
 
-    @Column(name = "is_read", nullable = false)
-    boolean isRead = false;
+    @Column(name = "is_confirmed", nullable = false)
+    private boolean isConfirmed = false;
 
-    @Column(name = "read_at")
-    Instant readAt;
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
 
     public Notification(UUID userId, String content, ResourceType resourceType, UUID resourceId) {
         this.userId = userId;
         this.content = content;
         this.resourceType = resourceType;
         this.resourceId = resourceId;
-        this.isRead = false;
-        this.readAt = null;
+        this.isConfirmed = false;
+        this.confirmedAt = null;
     }
 
     // 알림 확인 시 사용할 메서드
     public void markAsRead() {
-        if (!this.isRead) {
-            this.isRead = true;
-            this.readAt = Instant.now();
+        if (!this.isConfirmed) {
+            this.isConfirmed = true;
+            this.confirmedAt = Instant.now();
         }
     }
 }

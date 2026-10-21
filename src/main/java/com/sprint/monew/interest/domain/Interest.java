@@ -22,7 +22,7 @@ public class Interest extends BaseEntity {
     private String name;
 
     @Column(name = "subscriber_count", nullable = false)
-    private long subscriberCount = 0L;
+    private Long subscriberCount = 0L;
 
     @OneToMany(mappedBy = "interest", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InterestKeyword> keywords = new ArrayList<>();
