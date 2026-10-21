@@ -8,23 +8,24 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Getter
 @Entity
 @Table(name = "interest_keywords")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@FieldDefaults(level = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class InterestKeyword extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interest_id", nullable = false)
-    Interest interest;
+    private Interest interest;
 
     @Column(name = "keyword", nullable = false)
-    String keyword;
+    private String keyword;
+
+    public InterestKeyword(Interest interest, String keyword) {
+        this.interest = interest;
+        this.keyword = keyword;
+    }
 }
