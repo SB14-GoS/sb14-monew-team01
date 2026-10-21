@@ -14,37 +14,35 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldDefaults;
 
 @Entity
 @Getter
 @Table(name = "articles")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class Article extends BaseSoftDeleteEntity {
 
     @Column(nullable = false)
-    String title;
+    private String title;
 
     @Column(nullable = false)
-    Instant publishedDate;
+    private Instant publishedDate;
 
     @Column(columnDefinition = "text") // 255 범위 상한 해제
-    String summary;
+    private String summary;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    ArticleSource source;
+    private ArticleSource source;
 
     @Column(nullable = false, unique = true, columnDefinition = "text")
-    String sourceUrl;
+    private String sourceUrl;
 
     /* 생성시 조회수와 댓글은 항상 0이기에 */
     @Column(nullable = false)
-    long commentCount = 0;
+    private long commentCount = 0;
 
     @Column(nullable = false)
-    long viewCount = 0;
+    private long viewCount = 0;
 
     private Article(String title, Instant publishedDate, String summary, ArticleSource source, String sourceUrl) {
         if (title == null || title.isBlank() || title.length() > 255) {
