@@ -19,10 +19,10 @@ import lombok.NoArgsConstructor;
 @Getter
 public class Comment extends BaseSoftDeleteEntity {
 
-    @Column(nullable = false)
+    @Column(name = "article_id", nullable = false)
     private UUID articleId;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
     @Column(nullable = false)
