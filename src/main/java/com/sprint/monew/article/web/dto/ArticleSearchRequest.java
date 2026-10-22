@@ -1,5 +1,6 @@
 package com.sprint.monew.article.web.dto;
 
+import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.global.common.CursorRequest;
@@ -19,14 +20,14 @@ public record ArticleSearchRequest(
         List<ArticleSource> sourceIn,
         @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime publishDateFrom,
         @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime publishDateTo,
-        String orderBy,
+        ArticleOrderBy orderBy,
         SortDirection direction,
         String cursor,
         @DateTimeFormat(iso = ISO.DATE_TIME) Instant after,
         @Min(1) @Max(100) Integer limit) {
 
     public ArticleSearchRequest {
-        orderBy = orderBy == null || orderBy.isEmpty() ? "publishDate" : orderBy; // 기본 게시ㅡ
+        orderBy = orderBy == null ? ArticleOrderBy.PUBLISH_DATE : orderBy;
         direction = direction == null ? SortDirection.DESC : direction; // 기본 내림차순
         limit = limit == null ? 10 : limit; // 기본 10개
     }

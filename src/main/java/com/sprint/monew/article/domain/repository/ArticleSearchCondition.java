@@ -1,5 +1,6 @@
 package com.sprint.monew.article.domain.repository;
 
+import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
@@ -13,6 +14,6 @@ public record ArticleSearchCondition(
         List<ArticleSource> sourceIn,
         LocalDateTime publishDateFrom,
         LocalDateTime publishDateTo,
-        String orderBy,
+        ArticleOrderBy orderBy,
         SortDirection direction,
         CursorRequest page) {}

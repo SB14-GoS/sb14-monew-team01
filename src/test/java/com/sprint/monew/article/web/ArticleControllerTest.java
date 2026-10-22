@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sprint.monew.article.application.ArticleService;
+import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.article.web.dto.ArticleDto;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -65,7 +67,7 @@ class ArticleControllerTest {
                                 null,
                                 null,
                                 null,
-                                "publishDate",
+                                ArticleOrderBy.PUBLISH_DATE,
                                 SortDirection.DESC,
                                 new CursorRequest(null, null, 10)),
                         userId);
@@ -76,11 +78,12 @@ class ArticleControllerTest {
     void bindsAllSearchParameters() throws Exception {
         UUID interestId = UUID.randomUUID();
         UUID articleId = UUID.randomUUID();
+        String cursor = "80|" + articleId;
         Instant after = Instant.parse("2026-10-21T00:00:00Z");
         ArticleDto article = new ArticleDto(
                 articleId, ArticleSource.NAVER, "https://news.example/1", "경제 뉴스", after, "요약", 3L, 80L, true);
         given(articleService.search(any(), eq(userId)))
-                .willReturn(new CursorPageResponse<>(List.of(article), "80", after, 1, 53, true));
+                .willReturn(new CursorPageResponse<>(List.of(article), cursor, after, 1, 53, true));
 
         mockMvc.perform(get("/api/articles")
                         .header("Monew-Request-User-ID", userId)
@@ -91,14 +94,14 @@ class ArticleControllerTest {
                         .param("publishDateTo", "2026-10-22T00:00:00")
                         .param("orderBy", "viewCount")
                         .param("direction", "ASC")
-                        .param("cursor", "80")
+                        .param("cursor", cursor)
                         .param("after", "2026-10-21T00:00:00Z")
                         .param("limit", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(articleId.toString()))
                 .andExpect(jsonPath("$.content[0].title").value("경제 뉴스"))
                 .andExpect(jsonPath("$.content[0].viewedByMe").value(true))
-                .andExpect(jsonPath("$.nextCursor").value("80"))
+                .andExpect(jsonPath("$.nextCursor").value(cursor))
                 .andExpect(jsonPath("$.nextAfter").value(after.toString()))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.totalElements").value(53))
@@ -112,9 +115,33 @@ class ArticleControllerTest {
                                 List.of(ArticleSource.NAVER, ArticleSource.HANKYUNG),
                                 LocalDateTime.parse("2026-10-01T00:00:00"),
                                 LocalDateTime.parse("2026-10-22T00:00:00"),
-                                "viewCount",
+                                ArticleOrderBy.VIEW_COUNT,
                                 SortDirection.ASC,
-                                new CursorRequest("80", Instant.parse("2026-10-21T00:00:00Z"), 20)),
+                                new CursorRequest(cursor, Instant.parse("2026-10-21T00:00:00Z"), 20)),
+                        userId);
+    }
+
+    @ParameterizedTest
+    @EnumSource(ArticleOrderBy.class)
+    @DisplayName("기존 정렬 파라미터 이름을 enum으로 변환한다")
+    void bindsOrderByEnum(ArticleOrderBy orderBy) throws Exception {
+        given(articleService.search(any(), eq(userId)))
+                .willReturn(new CursorPageResponse<>(List.of(), null, null, 0, 0, false));
+        mockMvc.perform(get("/api/articles")
+                        .header("Monew-Request-User-ID", userId)
+                        .param("orderBy", orderBy.getValue()))
+                .andExpect(status().isOk());
+        verify(articleService)
+                .search(
+                        new ArticleSearchCondition(
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                orderBy,
+                                SortDirection.DESC,
+                                new CursorRequest(null, null, 10)),
                         userId);
     }
 
@@ -127,7 +154,15 @@ class ArticleControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"limit, 0", "limit, abc", "direction, invalid", "after, invalid", "interestId, invalid"})
+    @CsvSource({
+        "limit, 0",
+        "limit, 101",
+        "limit, abc",
+        "orderBy, invalid",
+        "direction, invalid",
+        "after, invalid",
+        "interestId, invalid"
+    })
     @DisplayName("잘못된 검색 파라미터는 서비스 호출 전에 400을 반환한다")
     void rejectsInvalidParameters(String name, String value) throws Exception {
         mockMvc.perform(get("/api/articles")
