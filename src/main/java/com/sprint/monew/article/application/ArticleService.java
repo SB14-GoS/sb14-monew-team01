@@ -4,6 +4,7 @@ import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
+import com.sprint.monew.article.domain.ArticleView;
 import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
@@ -34,6 +35,25 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     private final ArticleQueryRepository articleQueryRepository;
     private final ArticleViewRepository articleViewRepository;
     private final ArticleRepository articleRepository;
+
+    @Transactional(readOnly = true)
+    public ArticleDto read(UUID articleId, UUID userId) {
+        if (userId == null) {
+            throw new UserIdRequiredException();
+        }
+        /* 조회했을때 없는얘량 논리삭제된얘 예외던지기 */
+        Article article =
+                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
+        if (article.isDeleted()) {
+            throw new ArticleNotFoundException(articleId);
+        }
+
+        /* 요청받은 유저가 읽었는지 안읽었는지 */
+        Optional<ArticleView> articleView = articleViewRepository.findByArticleIdAndUserId(articleId, userId);
+        boolean viewedByUser = articleView.isPresent();
+
+        return ArticleDto.from(article, viewedByUser);
+    }
 
     @Transactional(readOnly = true)
     public CursorPageResponse<ArticleDto> search(ArticleSearchCondition condition, UUID userId) {
