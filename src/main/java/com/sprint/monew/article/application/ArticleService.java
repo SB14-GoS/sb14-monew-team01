@@ -1,9 +1,13 @@
 package com.sprint.monew.article.application;
 
+import com.sprint.monew.article.api.ArticleCommandApi;
+import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
+import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
+import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.article.domain.repository.ArticleSearchCursor;
 import com.sprint.monew.article.domain.repository.ArticleViewRepository;
@@ -16,6 +20,7 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class ArticleService {
+public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
 
     private final ArticleQueryRepository articleQueryRepository;
     private final ArticleViewRepository articleViewRepository;
+    private final ArticleRepository articleRepository;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<ArticleDto> search(ArticleSearchCondition condition, UUID userId) {
@@ -135,5 +141,25 @@ public class ArticleService {
             case VIEW_COUNT -> Long.toString(article.getViewCount());
         };
         return value + "|" + article.getId();
+    }
+
+    @Override
+    public boolean exists(UUID articleId) {
+        Optional<Article> target = articleRepository.findById(articleId);
+        if (target.isEmpty()) {
+            return false;
+        }
+        boolean result = target.get().isDeleted();
+
+        return !result;
+    }
+
+    @Transactional
+    @Override
+    public void increaseCommentCount(UUID articleId) {
+        if (!articleRepository.existsById(articleId)) {
+            throw new ArticleNotFoundException(articleId);
+        }
+        articleRepository.increaseCommentCount(articleId);
     }
 }

@@ -12,4 +12,8 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Article a set a.viewCount = a.viewCount + 1 where a.id = :articleId")
     int increaseViewCount(@Param("articleId") UUID articleId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Article a set a.commentCount = a.commentCount + 1 where a.id = :articleId")
+    int increaseCommentCount(@Param("articleId") UUID articleId);
 }
