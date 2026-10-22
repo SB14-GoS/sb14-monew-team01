@@ -1,14 +1,19 @@
 package com.sprint.monew.article.application;
 
 import com.sprint.monew.article.domain.Article;
+import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
+import com.sprint.monew.article.domain.repository.ArticleSearchCursor;
 import com.sprint.monew.article.domain.repository.ArticleViewRepository;
 import com.sprint.monew.article.web.dto.ArticleDto;
 import com.sprint.monew.global.common.CursorPageResponse;
+import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,12 +34,13 @@ public class ArticleService {
         if (userId == null) {
             throw new UserIdRequiredException();
         }
+        ArticleSearchCursor cursor = validateCondition(condition);
         /* UserNotFound 예외처리 구현 되어야함
           UserQueryApi.exists(userId) 유저 존재하는지 확인하는 쿼리구현 되어야함
         */
 
         /* 조건에 맞게 기사 가져옴 (limit + 1개 가져옴) */
-        List<Article> articles = articleQueryRepository.search(condition);
+        List<Article> articles = articleQueryRepository.search(condition, cursor);
         /* 조건에 맞는 기사의 총갯수 가져옴 */
         long totalElements = articleQueryRepository.countByCondition(condition);
 
@@ -58,26 +64,76 @@ public class ArticleService {
         }
 
         /* 읽음여부 체크 */
+        /* 읽었으면 true 넘겨줘서 Dto.from(article,true) 로 넘겨줌
+        그리고 viewByMe true지정, 안읽었으면 false반환 안읽음으로 표시
+        contains()로 존재, 미존재 여부 확인
+         */
         List<ArticleDto> content = page.content().stream()
-                .map(article -> ArticleDto.from(
-                        article,
-                        /* 읽었으면 true 넘겨줘서 Dto.from(article,true) 로 넘겨줌
-                        그리고 viewByMe true지정, 안읽었으면 false반환 안읽음으로 표시
-                        contains()로 존재, 미존재 여부 확인
-                         */
-                        viewedArticleIds.contains(article.getId())))
+                .map(article -> ArticleDto.from(article, viewedArticleIds.contains(article.getId())))
                 .toList();
 
         return new CursorPageResponse<>(
                 content, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
     }
 
-    private String cursorOf(Article article, String orderBy) {
-        return switch (orderBy) {
-            case "publishDate" -> article.getPublishedDate().toString();
-            case "commentCount" -> Long.toString(article.getCommentCount());
-            case "viewCount" -> Long.toString(article.getViewCount());
-            default -> throw new MonewException(CommonErrorCode.INCORRECT_REQUEST, Map.of("field", "orderBy"));
+    private ArticleSearchCursor validateCondition(ArticleSearchCondition condition) {
+        if (condition.orderBy() == null) {
+            throw invalidRequest("orderBy");
+        }
+        if (condition.direction() == null) {
+            throw invalidRequest("direction");
+        }
+        CursorRequest page = condition.page();
+        if (page == null || page.limit() == null || page.limit() < 1 || page.limit() > 100) {
+            throw invalidRequest("limit");
+        }
+        if (condition.publishDateFrom() != null
+                && condition.publishDateTo() != null
+                && condition.publishDateFrom().isAfter(condition.publishDateTo())) {
+            throw invalidRequest("publishDateFrom/publishDateTo");
+        }
+
+        boolean hasCursor = page.cursor() != null && !page.cursor().isBlank();
+        if (!hasCursor && page.after() == null) {
+            return null;
+        }
+        if (!hasCursor || page.after() == null) {
+            throw invalidRequest("cursor/after");
+        }
+        try {
+            String[] parts = page.cursor().split("\\|", -1);
+            if (parts.length != 2) {
+                throw invalidRequest("cursor");
+            }
+            UUID articleId = UUID.fromString(parts[1]);
+            if (!articleId.toString().equalsIgnoreCase(parts[1])) {
+                throw invalidRequest("cursor");
+            }
+            return switch (condition.orderBy()) {
+                case PUBLISH_DATE -> new ArticleSearchCursor(Instant.parse(parts[0]), null, page.after(), articleId);
+                case COMMENT_COUNT, VIEW_COUNT -> {
+                    long count = Long.parseLong(parts[0]);
+                    if (count < 0) {
+                        throw invalidRequest("cursor");
+                    }
+                    yield new ArticleSearchCursor(null, count, page.after(), articleId);
+                }
+            };
+        } catch (DateTimeParseException | IllegalArgumentException e) {
+            throw invalidRequest("cursor");
+        }
+    }
+
+    private MonewException invalidRequest(String field) {
+        return new MonewException(CommonErrorCode.INCORRECT_REQUEST, Map.of("field", field));
+    }
+
+    private String cursorOf(Article article, ArticleOrderBy orderBy) {
+        String value = switch (orderBy) {
+            case PUBLISH_DATE -> article.getPublishedDate().toString();
+            case COMMENT_COUNT -> Long.toString(article.getCommentCount());
+            case VIEW_COUNT -> Long.toString(article.getViewCount());
         };
+        return value + "|" + article.getId();
     }
 }

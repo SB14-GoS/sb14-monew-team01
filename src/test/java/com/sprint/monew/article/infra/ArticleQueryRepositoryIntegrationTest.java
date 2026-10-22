@@ -1,23 +1,24 @@
 package com.sprint.monew.article.infra;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sprint.monew.article.application.ArticleService;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleInterest;
+import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
+import com.sprint.monew.article.domain.repository.ArticleSearchCursor;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
-import com.sprint.monew.global.exception.CommonErrorCode;
-import com.sprint.monew.global.exception.MonewException;
 import com.sprint.monew.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -40,6 +41,9 @@ class ArticleQueryRepositoryIntegrationTest {
     @Autowired
     EntityManager em;
 
+    @Autowired
+    ArticleService articleService;
+
     @Test
     void keywordMatchesTitleOrSummaryAndExcludesDeletedArticles() {
         Article title = save("경제 뉴스", null, ArticleSource.NAVER, 0, 1);
@@ -49,15 +53,15 @@ class ArticleQueryRepositoryIntegrationTest {
         deleted.softDelete();
         em.flush();
 
-        ArticleSearchCondition condition =
-                condition("경제", null, null, null, null, "publishDate", SortDirection.DESC, null, null, 10);
+        ArticleSearchCondition condition = condition(
+                "경제", null, null, null, null, ArticleOrderBy.PUBLISH_DATE, SortDirection.DESC, null, null, 10);
 
-        assertThat(repository.search(condition))
+        assertThat(repository.search(condition, null))
                 .extracting(Article::getId)
                 .containsExactly(summary.getId(), title.getId());
         assertThat(repository.countByCondition(condition)).isEqualTo(2);
-        assertThat(repository.countByCondition(
-                        condition(" ", null, null, null, null, "publishDate", SortDirection.ASC, null, null, 10)))
+        assertThat(repository.countByCondition(condition(
+                        " ", null, null, null, null, ArticleOrderBy.PUBLISH_DATE, SortDirection.ASC, null, null, 10)))
                 .isEqualTo(3);
     }
 
@@ -82,18 +86,27 @@ class ArticleQueryRepositoryIntegrationTest {
                 List.of(ArticleSource.NAVER, ArticleSource.HANKYUNG),
                 local(BASE),
                 local(BASE.plusSeconds(2 * 86400)),
-                "publishDate",
+                ArticleOrderBy.PUBLISH_DATE,
                 SortDirection.ASC,
                 null,
                 null,
                 10);
 
-        assertThat(repository.search(condition))
+        assertThat(repository.search(condition, null))
                 .extracting(Article::getId)
                 .containsExactly(naver.getId(), hankyung.getId());
         assertThat(repository.countByCondition(condition)).isEqualTo(2);
         assertThat(repository.countByCondition(condition(
-                        null, UUID.randomUUID(), null, null, null, "publishDate", SortDirection.ASC, null, null, 10)))
+                        null,
+                        UUID.randomUUID(),
+                        null,
+                        null,
+                        null,
+                        ArticleOrderBy.PUBLISH_DATE,
+                        SortDirection.ASC,
+                        null,
+                        null,
+                        10)))
                 .isZero();
     }
 
@@ -102,34 +115,71 @@ class ArticleQueryRepositoryIntegrationTest {
         Article first = save("첫 기사", null, ArticleSource.NAVER, 0, 1);
         Article second = save("다음 기사", null, ArticleSource.HANKYUNG, 1, 2);
 
-        assertThat(repository.search(condition(
-                        null,
-                        null,
-                        List.of(),
-                        local(BASE.plusSeconds(86400)),
-                        null,
-                        "publishDate",
-                        SortDirection.ASC,
-                        null,
-                        null,
-                        10)))
+        assertThat(repository.search(
+                        condition(
+                                null,
+                                null,
+                                List.of(),
+                                local(BASE.plusSeconds(86400)),
+                                null,
+                                ArticleOrderBy.PUBLISH_DATE,
+                                SortDirection.ASC,
+                                null,
+                                null,
+                                10),
+                        null))
                 .extracting(Article::getId)
                 .containsExactly(second.getId());
-        assertThat(repository.search(condition(
-                        null, null, null, null, local(BASE), "publishDate", SortDirection.ASC, null, null, 10)))
+        assertThat(repository.search(
+                        condition(
+                                null,
+                                null,
+                                null,
+                                null,
+                                local(BASE),
+                                ArticleOrderBy.PUBLISH_DATE,
+                                SortDirection.ASC,
+                                null,
+                                null,
+                                10),
+                        null))
                 .extracting(Article::getId)
                 .containsExactly(first.getId());
     }
 
+    @Test
+    void filtersKoreanCalendarDayAtUtcBoundaries() {
+        saveAt(Instant.parse("2026-10-21T14:59:59Z")); // 한국 시간 10월 21일 23:59:59
+        Article first = saveAt(Instant.parse("2026-10-21T15:00:00Z")); // 한국 시간 10월 22일 00:00:00
+        Article last = saveAt(Instant.parse("2026-10-22T14:59:59Z")); // 한국 시간 10월 22일 23:59:59
+        saveAt(Instant.parse("2026-10-22T15:00:00Z")); // 한국 시간 10월 23일 00:00:00
+        ArticleSearchCondition condition = condition(
+                null,
+                null,
+                null,
+                LocalDateTime.parse("2026-10-22T00:00:00"),
+                LocalDateTime.parse("2026-10-22T23:59:59"),
+                ArticleOrderBy.PUBLISH_DATE,
+                SortDirection.ASC,
+                null,
+                null,
+                10);
+
+        assertThat(repository.search(condition, null))
+                .extracting(Article::getId)
+                .containsExactly(first.getId(), last.getId());
+        assertThat(repository.countByCondition(condition)).isEqualTo(2);
+    }
+
     static Stream<Arguments> sortOrders() {
-        return Stream.of("publishDate", "commentCount", "viewCount")
+        return Stream.of(ArticleOrderBy.PUBLISH_DATE, ArticleOrderBy.COMMENT_COUNT, ArticleOrderBy.VIEW_COUNT)
                 .flatMap(order -> Stream.of(SortDirection.ASC, SortDirection.DESC)
                         .map(direction -> Arguments.of(order, direction)));
     }
 
     @ParameterizedTest
     @MethodSource("sortOrders")
-    void paginatesEverySortInBothDirectionsWithoutCountingTheCursor(String orderBy, SortDirection direction) {
+    void paginatesEverySortInBothDirectionsWithoutCountingTheCursor(ArticleOrderBy orderBy, SortDirection direction) {
         Article high = save("높음", null, ArticleSource.NAVER, 3, 4);
         Article middleEarlier = save("중간 이전", null, ArticleSource.NAVER, 2, 2);
         Article middleLater = save("중간 이후", null, ArticleSource.NAVER, 2, 3);
@@ -140,12 +190,13 @@ class ArticleQueryRepositoryIntegrationTest {
         List<UUID> actual = new ArrayList<>();
         String cursor = null;
         Instant after = null;
+        ArticleSearchCursor searchCursor = null;
 
         // Four rows with limit=1 should terminate in four pages, including a tied primary sort value.
         for (int page = 0; page < 5; page++) {
             ArticleSearchCondition condition =
                     condition(null, null, null, null, null, orderBy, direction, cursor, after, 1);
-            List<Article> fetched = repository.search(condition);
+            List<Article> fetched = repository.search(condition, searchCursor);
             assertThat(fetched).hasSizeLessThanOrEqualTo(2);
             assertThat(repository.countByCondition(condition)).isEqualTo(4);
             if (fetched.isEmpty()) {
@@ -157,53 +208,68 @@ class ArticleQueryRepositoryIntegrationTest {
                 break;
             }
             cursor = switch (orderBy) {
-                case "publishDate" -> last.getPublishedDate().toString();
-                case "commentCount" -> Long.toString(last.getCommentCount());
-                case "viewCount" -> Long.toString(last.getViewCount());
-                default -> throw new AssertionError(orderBy);
+                case PUBLISH_DATE -> last.getPublishedDate().toString();
+                case COMMENT_COUNT -> Long.toString(last.getCommentCount());
+                case VIEW_COUNT -> Long.toString(last.getViewCount());
             };
+            cursor += "|" + last.getId();
             after = last.getCreatedAt();
+            searchCursor = switch (orderBy) {
+                case PUBLISH_DATE -> new ArticleSearchCursor(last.getPublishedDate(), null, after, last.getId());
+                case COMMENT_COUNT -> new ArticleSearchCursor(null, last.getCommentCount(), after, last.getId());
+                case VIEW_COUNT -> new ArticleSearchCursor(null, last.getViewCount(), after, last.getId());
+            };
         }
         assertThat(actual).containsExactlyElementsOf(expected);
     }
 
-    static Stream<ArticleSearchCondition> invalidConditions() {
-        return Stream.of(
-                condition(null, null, null, null, null, "unknown", SortDirection.ASC, null, null, 2),
-                condition(null, null, null, null, null, "publishDate", null, null, null, 2),
-                condition(
-                        null,
-                        null,
-                        null,
-                        local(BASE.plusSeconds(1)),
-                        local(BASE),
-                        "publishDate",
-                        SortDirection.ASC,
-                        null,
-                        null,
-                        2),
-                condition(null, null, null, null, null, "publishDate", SortDirection.ASC, "bad-date", BASE, 2),
-                condition(null, null, null, null, null, "viewCount", SortDirection.ASC, "abc", BASE, 2),
-                condition(null, null, null, null, null, "commentCount", SortDirection.ASC, "-1", BASE, 2),
-                condition(null, null, null, null, null, "viewCount", SortDirection.ASC, "1", null, 2),
-                condition(null, null, null, null, null, "viewCount", SortDirection.ASC, null, BASE, 2),
-                condition(null, null, null, null, null, "publishDate", SortDirection.ASC, null, null, 0));
-    }
-
     @ParameterizedTest
-    @MethodSource("invalidConditions")
-    void rejectsInvalidSearchParameters(ArticleSearchCondition condition) {
-        assertThatThrownBy(() -> repository.search(condition))
-                .isInstanceOfSatisfying(
-                        MonewException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(CommonErrorCode.INCORRECT_REQUEST));
+    @MethodSource("sortOrders")
+    void paginatesTiedSortValuesAndCreatedAtWithoutMissingArticles(ArticleOrderBy orderBy, SortDirection direction) {
+        List<UUID> ids = List.of(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                UUID.fromString("7fffffff-ffff-ffff-ffff-ffffffffffff"),
+                UUID.fromString("80000000-0000-0000-0000-000000000000"),
+                UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff"));
+        for (UUID id : ids) {
+            Article value = save("동률 기사", null, ArticleSource.NAVER, 0, 1);
+            em.createNativeQuery("update articles set id = :id where id = :oldId")
+                    .setParameter("id", id)
+                    .setParameter("oldId", value.getId())
+                    .executeUpdate();
+            em.clear();
+        }
+        List<UUID> expected = new ArrayList<>(ids);
+        if (direction == SortDirection.DESC) {
+            Collections.reverse(expected);
+        }
+        UUID userId = UUID.randomUUID();
+        for (int limit : List.of(1, 2)) {
+            List<UUID> actual = new ArrayList<>();
+            String cursor = null;
+            Instant after = null;
+            for (int page = 0; page < ids.size(); page++) {
+                var result = articleService.search(
+                        condition(null, null, null, null, null, orderBy, direction, cursor, after, limit), userId);
+                assertThat(result.totalElements()).isEqualTo(ids.size());
+                actual.addAll(result.content().stream().map(dto -> dto.id()).toList());
+                if (!result.hasNext()) {
+                    assertThat(result.nextCursor()).isNull();
+                    assertThat(result.nextAfter()).isNull();
+                    break;
+                }
+                cursor = result.nextCursor();
+                after = result.nextAfter();
+            }
+            assertThat(actual).containsExactlyElementsOf(expected).doesNotHaveDuplicates();
+        }
     }
 
     @Test
     void emptyResultHasZeroCount() {
         ArticleSearchCondition condition =
-                condition(null, null, null, null, null, "publishDate", SortDirection.ASC, null, null, 2);
-        assertThat(repository.search(condition)).isEmpty();
+                condition(null, null, null, null, null, ArticleOrderBy.PUBLISH_DATE, SortDirection.ASC, null, null, 2);
+        assertThat(repository.search(condition, null)).isEmpty();
         assertThat(repository.countByCondition(condition)).isZero();
     }
 
@@ -223,12 +289,19 @@ class ArticleQueryRepositoryIntegrationTest {
         return em.find(Article.class, id);
     }
 
+    private Article saveAt(Instant publishedDate) {
+        Article value = Article.create(
+                "경제 뉴스", publishedDate, null, ArticleSource.NAVER, "https://example.com/" + UUID.randomUUID());
+        em.persist(value);
+        return value;
+    }
+
     private void link(Article value, UUID interestId) {
         em.persist(ArticleInterest.create(em.getReference(Article.class, value.getId()), interestId));
     }
 
     private static LocalDateTime local(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+        return LocalDateTime.ofInstant(instant, ZoneId.of("Asia/Seoul"));
     }
 
     private static ArticleSearchCondition condition(
@@ -237,7 +310,7 @@ class ArticleQueryRepositoryIntegrationTest {
             List<ArticleSource> sources,
             LocalDateTime from,
             LocalDateTime to,
-            String orderBy,
+            ArticleOrderBy orderBy,
             SortDirection direction,
             String cursor,
             Instant after,
