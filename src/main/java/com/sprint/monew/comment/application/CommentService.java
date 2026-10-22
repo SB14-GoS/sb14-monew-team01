@@ -60,6 +60,11 @@ public class CommentService {
 
         long totalCommentCount = commentRepository.countByArticleId(articleId);
 
-        return null;
+        return CursorPageResponse.of(
+                comments,
+                request.limit(),
+                totalCommentCount,
+                comment -> comment.id().toString(),
+                CommentDto::createdAt);
     }
 }
