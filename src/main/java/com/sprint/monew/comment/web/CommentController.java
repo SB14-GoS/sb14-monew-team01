@@ -7,6 +7,7 @@ import com.sprint.monew.global.web.RequestUserId;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,14 +15,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-public class CommentController {
+public class CommentController implements CommentApiDocs {
     private final CommentService commentService;
 
     @PostMapping("api/comments")
-    public CommentDto register(
+    public ResponseEntity<CommentDto> register(
             @PathVariable UUID articleId,
             @RequestUserId UUID userId,
             @Valid @RequestBody CommentRegisterRequest request) {
-        return commentService.register(articleId, userId, request.content());
+        CommentDto commentDto = commentService.register(articleId, userId, request.content());
+        return ResponseEntity.ok(commentDto);
     }
 }
