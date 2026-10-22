@@ -1,14 +1,23 @@
 package com.sprint.monew.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sprint.monew.notification.domain.Notification;
 import com.sprint.monew.notification.domain.NotificationRepository;
 import com.sprint.monew.notification.domain.ResourceType;
+import com.sprint.monew.notification.domain.exception.NotificationNotFoundException;
 import com.sprint.monew.support.IntegrationTest;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -109,5 +118,65 @@ class NotificationServiceIntegrationTest {
 
         assertThat(notificationRepository.countByUserIdAndIsConfirmedFalse(userId))
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("전체 확인 후 단건 확인해도 확인 시각이 바뀌지 않는다")
+    void confirmAfterConfirmAllKeepsConfirmedAt() {
+        Notification notification = save(userId, false);
+        notificationService.confirmAll(userId);
+        Instant confirmedAt = reload(notification).getConfirmedAt();
+
+        notificationService.confirm(notification.getId(), userId);
+
+        assertThat(reload(notification).getConfirmedAt()).isEqualTo(confirmedAt);
+    }
+
+    @Test
+    @DisplayName("같은 알림을 동시에 확인해도 모두 성공하고 확인 시각은 한 번만 기록된다")
+    void concurrentConfirmKeepsFirstConfirmedAt() throws Exception {
+        Notification notification = save(userId, false);
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    notificationService.confirm(notification.getId(), userId);
+                    return null;
+                }));
+            }
+            ready.await();
+            start.countDown();
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        Instant confirmedAt = reload(notification).getConfirmedAt();
+        assertThat(reload(notification).isConfirmed()).isTrue();
+        assertThat(confirmedAt).isNotNull();
+
+        notificationService.confirm(notification.getId(), userId);
+        assertThat(reload(notification).getConfirmedAt()).isEqualTo(confirmedAt);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 알림을 확인하면 404 예외를 던지고 DB 상태는 그대로다")
+    void confirmOthersNotificationKeepsState() {
+        Notification others = save(UUID.randomUUID(), false);
+
+        assertThatThrownBy(() -> notificationService.confirm(others.getId(), userId))
+                .isInstanceOf(NotificationNotFoundException.class);
+
+        Notification found = reload(others);
+        assertThat(found.isConfirmed()).isFalse();
+        assertThat(found.getConfirmedAt()).isNull();
     }
 }

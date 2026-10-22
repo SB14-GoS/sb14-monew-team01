@@ -4,7 +4,6 @@ import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
-import com.sprint.monew.notification.domain.Notification;
 import com.sprint.monew.notification.domain.NotificationQueryRepository;
 import com.sprint.monew.notification.domain.NotificationRepository;
 import com.sprint.monew.notification.domain.exception.NotificationNotFoundException;
@@ -50,12 +49,10 @@ public class NotificationService {
 
     @Transactional
     public void confirm(UUID notificationId, UUID userId) {
-        Notification notification = notificationRepository
-                .findById(notificationId)
-                .filter(n -> n.getUserId().equals(userId))
-                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
-
-        notification.markAsRead();
+        int updated = notificationRepository.confirmByIdAndUserId(notificationId, userId, Instant.now());
+        if (updated == 0 && !notificationRepository.existsByIdAndUserId(notificationId, userId)) {
+            throw new NotificationNotFoundException(notificationId);
+        }
     }
 
     @Transactional

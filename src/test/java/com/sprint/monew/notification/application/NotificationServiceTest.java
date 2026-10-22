@@ -1,6 +1,7 @@
 package com.sprint.monew.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -22,7 +23,6 @@ import com.sprint.monew.notification.domain.exception.NotificationNotFoundExcept
 import com.sprint.monew.notification.web.dto.NotificationDto;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -144,36 +144,39 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("내 알림을 확인하면 확인 상태와 확인 시각이 채워진다")
-    void confirmOwnNotification() {
-        Notification notification = notification(ResourceType.COMMENT, Instant.parse("2026-10-22T01:00:00Z"));
-        given(notificationRepository.findById(notification.getId())).willReturn(Optional.of(notification));
-
-        notificationService.confirm(notification.getId(), userId);
-
-        assertThat(notification.isConfirmed()).isTrue();
-        assertThat(notification.getConfirmedAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("다른 사용자의 알림을 확인하면 NOTIFICATION_NOT_FOUND 예외를 던지고 상태를 바꾸지 않는다")
-    void confirmOthersNotification() {
-        Notification notification = notification(ResourceType.COMMENT, Instant.parse("2026-10-22T01:00:00Z"));
-        given(notificationRepository.findById(notification.getId())).willReturn(Optional.of(notification));
-
-        assertThatThrownBy(() -> notificationService.confirm(notification.getId(), UUID.randomUUID()))
-                .isInstanceOf(NotificationNotFoundException.class)
-                .extracting("errorCode")
-                .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
-        assertThat(notification.isConfirmed()).isFalse();
-        assertThat(notification.getConfirmedAt()).isNull();
-    }
-
-    @Test
-    @DisplayName("없는 알림을 확인하면 NOTIFICATION_NOT_FOUND 예외를 던진다")
-    void confirmMissingNotification() {
+    @DisplayName("미확인 내 알림은 조건부 UPDATE 한 번으로 확인 처리하고 존재 여부를 따로 조회하지 않는다")
+    void confirmUnconfirmedNotification() {
         UUID notificationId = UUID.randomUUID();
-        given(notificationRepository.findById(notificationId)).willReturn(Optional.empty());
+        given(notificationRepository.confirmByIdAndUserId(eq(notificationId), eq(userId), any(Instant.class)))
+                .willReturn(1);
+
+        notificationService.confirm(notificationId, userId);
+
+        verify(notificationRepository).confirmByIdAndUserId(eq(notificationId), eq(userId), any(Instant.class));
+        verify(notificationRepository, never()).existsByIdAndUserId(any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 확인한 내 알림은 바뀐 행이 없어도 예외 없이 끝난다")
+    void confirmAlreadyConfirmedNotification() {
+        UUID notificationId = UUID.randomUUID();
+        given(notificationRepository.confirmByIdAndUserId(eq(notificationId), eq(userId), any(Instant.class)))
+                .willReturn(0);
+        given(notificationRepository.existsByIdAndUserId(notificationId, userId))
+                .willReturn(true);
+
+        assertThatCode(() -> notificationService.confirm(notificationId, userId))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("없거나 다른 사용자의 알림이면 NOTIFICATION_NOT_FOUND 예외를 던진다")
+    void confirmMissingOrOthersNotification() {
+        UUID notificationId = UUID.randomUUID();
+        given(notificationRepository.confirmByIdAndUserId(eq(notificationId), eq(userId), any(Instant.class)))
+                .willReturn(0);
+        given(notificationRepository.existsByIdAndUserId(notificationId, userId))
+                .willReturn(false);
 
         assertThatThrownBy(() -> notificationService.confirm(notificationId, userId))
                 .isInstanceOf(NotificationNotFoundException.class)
