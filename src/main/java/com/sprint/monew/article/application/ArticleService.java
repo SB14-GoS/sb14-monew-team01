@@ -143,6 +143,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         return value + "|" + article.getId();
     }
 
+    @Transactional(readOnly = true)
     @Override
     public boolean exists(UUID articleId) {
         Optional<Article> target = articleRepository.findById(articleId);
@@ -160,6 +161,9 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         if (!articleRepository.existsById(articleId)) {
             throw new ArticleNotFoundException(articleId);
         }
-        articleRepository.increaseCommentCount(articleId);
+        int updated = articleRepository.increaseCommentCount(articleId);
+        if (updated == 0) {
+            throw new ArticleNotFoundException(articleId);
+        }
     }
 }
