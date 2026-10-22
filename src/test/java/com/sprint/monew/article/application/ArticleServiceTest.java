@@ -10,8 +10,11 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
+import com.sprint.monew.article.domain.ArticleView;
+import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
+import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.article.domain.repository.ArticleSearchCursor;
 import com.sprint.monew.article.domain.repository.ArticleViewRepository;
@@ -24,6 +27,7 @@ import com.sprint.monew.global.exception.MonewException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -49,12 +53,51 @@ class ArticleServiceTest {
     @Mock
     ArticleViewRepository articleViewRepository;
 
+    @Mock
+    ArticleRepository articleRepository;
+
     @InjectMocks
     ArticleService articleService;
 
     private static final Instant BASE = Instant.parse("2026-10-21T00:00:00Z");
     private static final UUID CURSOR_ARTICLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final UUID userId = UUID.randomUUID();
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("단건 조회는 기사 정보와 요청자의 읽음 여부를 반환한다")
+    void readsArticleWithViewedStatus(boolean viewed) {
+        Article article = article(1);
+        given(articleRepository.findById(article.getId())).willReturn(Optional.of(article));
+        given(articleViewRepository.findByArticleIdAndUserId(article.getId(), userId))
+                .willReturn(viewed ? Optional.of(ArticleView.create(article, userId)) : Optional.empty());
+
+        ArticleDto result = articleService.read(article.getId(), userId);
+
+        assertThat(result).isEqualTo(ArticleDto.from(article, viewed));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("없거나 논리 삭제된 기사는 읽음 기록 조회 없이 예외를 던진다")
+    void rejectsMissingOrDeletedArticle(boolean deleted) {
+        Article article = article(1);
+        article.softDelete();
+        given(articleRepository.findById(article.getId()))
+                .willReturn(deleted ? Optional.of(article) : Optional.empty());
+
+        assertThatThrownBy(() -> articleService.read(article.getId(), userId))
+                .isInstanceOf(ArticleNotFoundException.class);
+        verifyNoInteractions(articleViewRepository);
+    }
+
+    @Test
+    @DisplayName("단건 조회에서 사용자 ID가 없으면 Repository 호출 전에 예외를 던진다")
+    void rejectsReadWithoutUserId() {
+        assertThatThrownBy(() -> articleService.read(UUID.randomUUID(), null))
+                .isInstanceOf(UserIdRequiredException.class);
+        verifyNoInteractions(articleRepository, articleViewRepository);
+    }
 
     @Test
     @DisplayName("사용자 ID가 없으면 조회 없이 예외를 던진다")

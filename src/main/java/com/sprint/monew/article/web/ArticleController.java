@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -19,6 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ArticleController implements ArticleApiDocs {
 
     private final ArticleService articleService;
+
+    @Override
+    @GetMapping("/api/articles/{articleId}")
+    public ResponseEntity<ArticleDto> read(@PathVariable UUID articleId, @RequestUserId UUID userId) {
+        ArticleDto result = articleService.read(articleId, userId);
+        return ResponseEntity.status(HttpStatus.OK).body(result);
+    }
 
     @Override
     @GetMapping("/api/articles")

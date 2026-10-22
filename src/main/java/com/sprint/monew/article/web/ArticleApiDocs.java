@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "뉴스 기사 관리")
 public interface ArticleApiDocs {
 
+    @Operation(summary = "뉴스 기사 단건 조회")
+    ResponseEntity<ArticleDto> read(UUID articleId, UUID userId);
+
     @Operation(summary = "뉴스 기사 목록 조회")
     ResponseEntity<CursorPageResponse<ArticleDto>> search(ArticleSearchRequest request, UUID userId);
 }
