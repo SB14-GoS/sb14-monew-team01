@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,12 +14,15 @@ import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
 import com.sprint.monew.notification.domain.Notification;
+import com.sprint.monew.notification.domain.NotificationErrorCode;
 import com.sprint.monew.notification.domain.NotificationQueryRepository;
 import com.sprint.monew.notification.domain.NotificationRepository;
 import com.sprint.monew.notification.domain.ResourceType;
+import com.sprint.monew.notification.domain.exception.NotificationNotFoundException;
 import com.sprint.monew.notification.web.dto.NotificationDto;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -137,5 +141,51 @@ class NotificationServiceTest {
         assertThat(dto.confirmed()).isFalse();
         assertThat(dto.resourceId()).isEqualTo(interest.getResourceId());
         assertThat(result.content()).extracting(NotificationDto::resourceType).containsExactly("interest", "comment");
+    }
+
+    @Test
+    @DisplayName("내 알림을 확인하면 확인 상태와 확인 시각이 채워진다")
+    void confirmOwnNotification() {
+        Notification notification = notification(ResourceType.COMMENT, Instant.parse("2026-10-22T01:00:00Z"));
+        given(notificationRepository.findById(notification.getId())).willReturn(Optional.of(notification));
+
+        notificationService.confirm(notification.getId(), userId);
+
+        assertThat(notification.isConfirmed()).isTrue();
+        assertThat(notification.getConfirmedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 알림을 확인하면 NOTIFICATION_NOT_FOUND 예외를 던지고 상태를 바꾸지 않는다")
+    void confirmOthersNotification() {
+        Notification notification = notification(ResourceType.COMMENT, Instant.parse("2026-10-22T01:00:00Z"));
+        given(notificationRepository.findById(notification.getId())).willReturn(Optional.of(notification));
+
+        assertThatThrownBy(() -> notificationService.confirm(notification.getId(), UUID.randomUUID()))
+                .isInstanceOf(NotificationNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
+        assertThat(notification.isConfirmed()).isFalse();
+        assertThat(notification.getConfirmedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("없는 알림을 확인하면 NOTIFICATION_NOT_FOUND 예외를 던진다")
+    void confirmMissingNotification() {
+        UUID notificationId = UUID.randomUUID();
+        given(notificationRepository.findById(notificationId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> notificationService.confirm(notificationId, userId))
+                .isInstanceOf(NotificationNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("전체 확인은 사용자 ID로 벌크 업데이트를 호출한다")
+    void confirmAll() {
+        notificationService.confirmAll(userId);
+
+        verify(notificationRepository).confirmAllByUserId(eq(userId), any(Instant.class));
     }
 }
