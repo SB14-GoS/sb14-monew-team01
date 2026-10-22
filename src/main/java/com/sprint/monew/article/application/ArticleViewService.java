@@ -2,10 +2,10 @@ package com.sprint.monew.article.application;
 
 import com.sprint.monew.article.api.ArticleViewedEvent;
 import com.sprint.monew.article.domain.Article;
-import com.sprint.monew.article.domain.ArticleRepository;
 import com.sprint.monew.article.domain.ArticleView;
-import com.sprint.monew.article.domain.ArticleViewRepository;
 import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
+import com.sprint.monew.article.domain.repository.ArticleRepository;
+import com.sprint.monew.article.domain.repository.ArticleViewRepository;
 import com.sprint.monew.article.web.dto.ArticleViewDto;
 import java.util.Optional;
 import java.util.UUID;

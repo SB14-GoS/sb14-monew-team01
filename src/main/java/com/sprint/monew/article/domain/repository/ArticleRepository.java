@@ -1,5 +1,6 @@
-package com.sprint.monew.article.domain;
+package com.sprint.monew.article.domain.repository;
 
+import com.sprint.monew.article.domain.Article;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
