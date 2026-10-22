@@ -4,9 +4,12 @@ import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
+import com.sprint.monew.notification.domain.Notification;
 import com.sprint.monew.notification.domain.NotificationQueryRepository;
 import com.sprint.monew.notification.domain.NotificationRepository;
+import com.sprint.monew.notification.domain.exception.NotificationNotFoundException;
 import com.sprint.monew.notification.web.dto.NotificationDto;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +46,21 @@ public class NotificationService {
                 total,
                 notificationDto -> notificationDto.id().toString(),
                 NotificationDto::createdAt);
+    }
+
+    @Transactional
+    public void confirm(UUID notificationId, UUID userId) {
+        Notification notification = notificationRepository
+                .findById(notificationId)
+                .filter(n -> n.getUserId().equals(userId))
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
+
+        notification.markAsRead();
+    }
+
+    @Transactional
+    public void confirmAll(UUID userId) {
+        notificationRepository.confirmAllByUserId(userId, Instant.now());
     }
 
     private UUID parseCursor(String cursor) {
