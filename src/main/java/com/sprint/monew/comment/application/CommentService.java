@@ -9,8 +9,10 @@ import com.sprint.monew.comment.domain.CommentException;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
+import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +48,18 @@ public class CommentService {
         return new CommentCreatedEvent(comment.getId(), comment.getArticleId(), comment.getUserId());
     }
 
-    public CursorPageResponse<CommentDto> getComments() {
+    public CursorPageResponse<CommentDto> readAll(UUID articleId, CursorRequest request) {
+
+        List<CommentDto> comments = commentRepository.findByArticleId(articleId, request).stream()
+                .map(comment -> CommentDto.from(
+                        comment,
+                        userQueryApi.getSummary(comment.getUserId()).nickname(), // n+1 문제가 생성됨.
+                        false // 임시 false
+                        ))
+                .toList();
+
+        long totalCommentCount = commentRepository.countByArticleId(articleId);
+
         return null;
     }
 }
