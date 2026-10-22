@@ -8,6 +8,7 @@ import com.sprint.monew.comment.domain.CommentErrorCode;
 import com.sprint.monew.comment.domain.CommentException;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.web.dto.CommentDto;
+import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.Map;
@@ -43,5 +44,9 @@ public class CommentService {
 
     private CommentCreatedEvent toCreatedEvent(Comment comment) {
         return new CommentCreatedEvent(comment.getId(), comment.getArticleId(), comment.getUserId());
+    }
+
+    public CursorPageResponse<CommentDto> getComments() {
+        return null;
     }
 }
