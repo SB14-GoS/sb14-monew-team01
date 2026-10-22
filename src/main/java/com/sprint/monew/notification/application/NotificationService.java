@@ -25,6 +25,9 @@ public class NotificationService {
     public CursorPageResponse<NotificationDto> getNotifications(CursorRequest request, UUID userId) {
         UUID cursorId = parseCursor(request.cursor());
 
+        if ((request.cursor() == null) != (request.after() == null)) {
+            throw new MonewException(CommonErrorCode.INCORRECT_REQUEST, Map.of("field", "cursor/after"));
+        }
         List<NotificationDto> notificationDtos =
                 notificationQueryRepository
                         .findUnconfirmedByUserIdWithCursor(userId, cursorId, request.after(), request.limit())

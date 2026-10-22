@@ -2,6 +2,7 @@ package com.sprint.monew.notification.web.dto;
 
 import com.sprint.monew.notification.domain.Notification;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 public record NotificationDto(
@@ -22,7 +23,7 @@ public record NotificationDto(
                 notification.isConfirmed(),
                 notification.getUserId(),
                 notification.getContent(),
-                notification.getResourceType().name().toLowerCase(), // 명세: "interest" / "comment"
+                notification.getResourceType().name().toLowerCase(Locale.ROOT), // 명세: "interest" / "comment"
                 notification.getResourceId());
     }
 }
