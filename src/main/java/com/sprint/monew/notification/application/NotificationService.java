@@ -4,6 +4,7 @@ import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
+import com.sprint.monew.notification.domain.NotificationQueryRepository;
 import com.sprint.monew.notification.domain.NotificationRepository;
 import com.sprint.monew.notification.web.dto.NotificationDto;
 import java.util.List;
@@ -19,12 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationQueryRepository notificationQueryRepository;
 
     public CursorPageResponse<NotificationDto> getNotifications(CursorRequest request, UUID userId) {
         UUID cursorId = parseCursor(request.cursor());
 
         List<NotificationDto> notificationDtos =
-                notificationRepository
+                notificationQueryRepository
                         .findUnconfirmedByUserIdWithCursor(userId, cursorId, request.after(), request.limit())
                         .stream()
                         .map(NotificationDto::from)
