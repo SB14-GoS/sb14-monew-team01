@@ -10,7 +10,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
 
+@Repository
 @RequiredArgsConstructor
 public class NotificationQueryRepositoryImpl implements NotificationQueryRepository {
 
