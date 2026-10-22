@@ -40,4 +40,8 @@ public class CommentService {
 
         return CommentDto.from(comment, user.nickname(), false);
     }
+
+    private CommentCreatedEvent toCreatedEvent(Comment comment) {
+        return new CommentCreatedEvent(comment.getId(), comment.getArticleId(), comment.getUserId());
+    }
 }
