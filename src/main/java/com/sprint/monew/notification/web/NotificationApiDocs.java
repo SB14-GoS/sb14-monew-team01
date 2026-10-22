@@ -13,4 +13,10 @@ public interface NotificationApiDocs {
 
     @Operation(summary = "알림 목록 조회")
     ResponseEntity<CursorPageResponse<NotificationDto>> getNotifications(CursorRequest request, UUID userId);
+
+    @Operation(summary = "알림 확인")
+    ResponseEntity<Void> confirm(UUID notificationId, UUID userId);
+
+    @Operation(summary = "전체 알림 확인")
+    ResponseEntity<Void> confirmAll(UUID userId);
 }
