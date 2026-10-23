@@ -33,7 +33,7 @@ public class UserControllerTest {
         UserDto userDto = new UserDto(UUID.randomUUID(), "woody@monew.com", "우디", Instant.now());
         given(userService.register(any())).willReturn(userDto);
 
-        mockMvc.perform(post("/api.users")
+        mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email": "woody@monew.com", "nickname": "우디", "password": "monew1!"}
