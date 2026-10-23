@@ -1,9 +1,11 @@
 package com.sprint.monew.user.application;
 
 import com.sprint.monew.user.domain.EmailDuplicatedException;
+import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
 import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.web.dto.UserDto;
+import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -34,6 +36,15 @@ public class UserService {
             }
             throw e;
         }
+    }
+
+    public UserDto login(UserLoginRequest request) {
+        User user = userRepository
+                .findByEmail(request.email())
+                .filter(found -> !found.isDeleted())
+                .filter(found -> passwordEncoder.matches(request.password(), found.getPassword()))
+                .orElseThrow(LoginFailedException::new);
+        return UserDto.from(user);
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
