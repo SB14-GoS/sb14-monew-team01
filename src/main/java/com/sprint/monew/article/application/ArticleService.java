@@ -42,11 +42,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
             throw new UserIdRequiredException();
         }
         /* 조회했을때 없는얘량 논리삭제된얘 예외던지기 */
-        Article article =
-                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
-        if (article.isDeleted()) {
-            throw new ArticleNotFoundException(articleId);
-        }
+        Article article = findActiveArticle(articleId);
 
         /* 요청받은 유저가 읽었는지 안읽었는지 */
         Optional<ArticleView> articleView = articleViewRepository.findByArticleIdAndUserId(articleId, userId);
@@ -178,12 +174,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     @Transactional(readOnly = true)
     @Override
     public String getTitle(UUID articleId) {
-        Article target =
-                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
-        if (target.isDeleted()) {
-            throw new ArticleNotFoundException(articleId);
-        }
-        return target.getTitle();
+        return findActiveArticle(articleId).getTitle();
     }
 
     @Transactional
@@ -196,5 +187,13 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         if (updated == 0) {
             throw new ArticleNotFoundException(articleId);
         }
+    }
+
+    /* 존재하지 않고, 논리삭제된애들 거르기 */
+    private Article findActiveArticle(UUID articleId) {
+        return articleRepository
+                .findById(articleId)
+                .filter(article -> !article.isDeleted())
+                .orElseThrow(() -> new ArticleNotFoundException(articleId));
     }
 }
