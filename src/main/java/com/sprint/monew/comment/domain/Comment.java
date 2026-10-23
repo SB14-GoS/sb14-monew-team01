@@ -1,5 +1,8 @@
 package com.sprint.monew.comment.domain;
 
+import com.sprint.monew.comment.domain.exception.ArticleIdRequiredException;
+import com.sprint.monew.comment.domain.exception.CommentUserIdRequiredException;
+import com.sprint.monew.comment.domain.exception.InvalidCommentContentException;
 import com.sprint.monew.global.common.BaseSoftDeleteEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -38,6 +41,15 @@ public class Comment extends BaseSoftDeleteEntity {
     private List<CommentLike> commentLike = new ArrayList<>();
 
     public Comment(UUID articleId, UUID userId, String content) {
+        if (articleId == null) {
+            throw new ArticleIdRequiredException();
+        }
+        if (userId == null) {
+            throw new CommentUserIdRequiredException();
+        }
+        if (content == null || content.isBlank() || content.length() > 500) {
+            throw new InvalidCommentContentException(content);
+        }
         this.articleId = articleId;
         this.userId = userId;
         this.content = content;
