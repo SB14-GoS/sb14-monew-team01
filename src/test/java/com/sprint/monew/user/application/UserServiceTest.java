@@ -8,11 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.user.domain.EmailDuplicatedException;
+import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
 import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.web.dto.UserDto;
+import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import java.sql.SQLException;
+import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -90,5 +93,48 @@ public class UserServiceTest {
                         "other", new ConstraintViolationException("other", new SQLException(), "other_constraint")));
 
         assertThatThrownBy(() -> userService.register(request)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("이메일과 비밀번호가 맞으면 로그인에 성공한다")
+    void login() {
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findByEmail("woody@monew.com")).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("monew1!", "encoded-password")).willReturn(true);
+
+        UserDto result = userService.login(new UserLoginRequest("woody@monew.com", "monew1!"));
+
+        assertThat(result.email()).isEqualTo("woody@monew.com");
+    }
+
+    @Test
+    @DisplayName("가입되지 않은 이메일이면 로그인에 실패한다")
+    void loginWithUnknownEmail() {
+        given(userRepository.findByEmail("none@monew.com")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.login(new UserLoginRequest("none@monew.com", "monew1!")))
+                .isInstanceOf(LoginFailedException.class);
+    }
+
+    @Test
+    @DisplayName("비밀번호가 틀리면 로그인에 실패한다")
+    void loginWithWrongPassword() {
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findByEmail("woody@monew.com")).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("wrong!!", "encoded-password")).willReturn(false);
+
+        assertThatThrownBy(() -> userService.login(new UserLoginRequest("woody@monew.com", "wrong!!")))
+                .isInstanceOf(LoginFailedException.class);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 사용자는 로그인할 수 없다")
+    void loginWithDeletedUser() {
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        user.softDelete();
+        given(userRepository.findByEmail("woody@monew.com")).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.login(new UserLoginRequest("woody@monew.com", "monew1!")))
+                .isInstanceOf(LoginFailedException.class);
     }
 }
