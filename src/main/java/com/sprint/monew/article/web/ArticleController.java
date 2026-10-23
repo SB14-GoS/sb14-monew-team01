@@ -1,11 +1,13 @@
 package com.sprint.monew.article.web;
 
 import com.sprint.monew.article.application.ArticleService;
+import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.web.dto.ArticleDto;
 import com.sprint.monew.article.web.dto.ArticleSearchRequest;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.web.RequestUserId;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,5 +36,11 @@ public class ArticleController implements ArticleApiDocs {
             @Valid @ModelAttribute ArticleSearchRequest request, @RequestUserId UUID userId) {
         CursorPageResponse<ArticleDto> result = articleService.search(request.toCondition(), userId);
         return ResponseEntity.status(HttpStatus.OK).body(result);
+    }
+
+    @Override
+    @GetMapping("/api/articles/sources")
+    public ResponseEntity<List<ArticleSource>> getSourceList() {
+        return ResponseEntity.status(HttpStatus.OK).body(articleService.getSourceList());
     }
 }
