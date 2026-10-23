@@ -8,7 +8,6 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,10 +19,8 @@ public class CommentController implements CommentApiDocs {
 
     @PostMapping("api/comments")
     public ResponseEntity<CommentDto> register(
-            @PathVariable UUID articleId,
-            @RequestUserId UUID userId,
-            @Valid @RequestBody CommentRegisterRequest request) {
-        CommentDto commentDto = commentService.register(articleId, userId, request.content());
+            @RequestUserId UUID userId, @Valid @RequestBody CommentRegisterRequest request) {
+        CommentDto commentDto = commentService.register(request.articleId(), userId, request.content());
         return ResponseEntity.ok(commentDto);
     }
 }
