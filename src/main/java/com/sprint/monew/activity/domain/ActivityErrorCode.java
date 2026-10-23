@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ActivityErrorCode implements ErrorCode {
-    EXAMPLE(null, null, null);
+    USER_ACTIVITY_NOT_FOUND(Level.WARN, HttpStatus.NOT_FOUND, "해당 유저의 활동을 찾지 못 했습니다.");
 
     private final Level level;
     private final HttpStatus status;
