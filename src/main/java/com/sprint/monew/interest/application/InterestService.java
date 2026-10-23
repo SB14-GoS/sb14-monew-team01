@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -25,7 +26,7 @@ public class InterestService implements InterestQueryApi {
     private final InterestRepository interestRepository;
     private final SubscriptionRepository subscriptionRepository;
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public InterestDto registerInterest(InterestRegisterRequest request) {
         validateNameSimilarity(request.name());
         Interest interest = new Interest(request.name(), request.keywords());
