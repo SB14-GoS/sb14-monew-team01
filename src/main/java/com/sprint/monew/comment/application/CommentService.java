@@ -4,16 +4,15 @@ import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
-import com.sprint.monew.comment.domain.CommentErrorCode;
-import com.sprint.monew.comment.domain.CommentException;
 import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
+import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,7 +32,11 @@ public class CommentService {
     @Transactional
     public CommentDto register(UUID articleId, UUID userId, String content) {
         if (!articleQueryApi.exists(articleId)) {
-            throw new CommentException(CommentErrorCode.ARTICLE_NOT_FOUND, Map.of("articleId", articleId));
+            throw new CommentArticleNotFoundException(articleId);
+        }
+
+        if (!userQueryApi.exists(userId)) {
+            throw new CommentUserNotFoundException(userId);
         }
 
         UserSummary user = userQueryApi.getSummary(userId);
@@ -50,6 +53,9 @@ public class CommentService {
 
     @Transactional(readOnly = true)
     public CursorPageResponse<CommentDto> readAll(UUID articleId, CursorRequest request) {
+        if (!articleQueryApi.exists(articleId)) {
+            throw new CommentArticleNotFoundException(articleId);
+        }
 
         List<CommentDto> comments = commentRepository.findByArticleId(articleId, request).stream()
                 .map(comment -> CommentDto.from(

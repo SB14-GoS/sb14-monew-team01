@@ -12,9 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -24,16 +24,14 @@ public class CommentController implements CommentApiDocs {
 
     @PostMapping("api/comments")
     public ResponseEntity<CommentDto> register(
-            @PathVariable UUID articleId,
-            @RequestUserId UUID userId,
-            @Valid @RequestBody CommentRegisterRequest request) {
-        CommentDto commentDto = commentService.register(articleId, userId, request.content());
+            @RequestUserId UUID userId, @Valid @RequestBody CommentRegisterRequest request) {
+        CommentDto commentDto = commentService.register(request.articleId(), userId, request.content());
         return ResponseEntity.ok(commentDto);
     }
 
     @GetMapping("api/comments")
     public ResponseEntity<CursorPageResponse<CommentDto>> readAll(
-            @PathVariable UUID articleId, @Valid @ModelAttribute CursorRequest request) {
+            @RequestParam UUID articleId, @Valid @ModelAttribute CursorRequest request) {
         CursorPageResponse<CommentDto> readAll = commentService.readAll(articleId, request);
         return ResponseEntity.ok(readAll);
     }

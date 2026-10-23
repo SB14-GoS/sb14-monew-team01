@@ -39,7 +39,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
         Long count = queryFactory
                 .select(comment.count())
                 .from(comment)
-                .where(comment.articleId.eq(articleId), comment.deleted.isNull())
+                .where(comment.articleId.eq(articleId), comment.deletedAt.isNull())
                 .fetchOne();
         return count == null ? 0L : count;
     }

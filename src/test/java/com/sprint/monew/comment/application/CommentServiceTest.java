@@ -8,9 +8,10 @@ import static org.mockito.BDDMockito.then;
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
-import com.sprint.monew.comment.domain.CommentErrorCode;
-import com.sprint.monew.comment.domain.CommentException;
 import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
+import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
+import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.UUID;
@@ -47,6 +48,7 @@ class CommentServiceTest {
         UUID articleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         given(articleQueryApi.exists(articleId)).willReturn(true);
+        given(userQueryApi.exists(userId)).willReturn(true);
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "댓글작성자"));
         given(commentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
@@ -65,11 +67,34 @@ class CommentServiceTest {
         given(articleQueryApi.exists(articleId)).willReturn(false);
 
         assertThatThrownBy(() -> commentService.register(articleId, UUID.randomUUID(), "댓글"))
-                .isInstanceOf(CommentException.class)
-                .extracting("errorCode")
-                .isEqualTo(CommentErrorCode.ARTICLE_NOT_FOUND);
+                .isInstanceOf(CommentArticleNotFoundException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
         then(articleCommandApi).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 존재하지_않는_사용자는_댓글을_등록할_수_없다() {
+        UUID articleId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+        given(userQueryApi.exists(userId)).willReturn(false);
+
+        assertThatThrownBy(() -> commentService.register(articleId, userId, "댓글"))
+                .isInstanceOf(CommentUserNotFoundException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
+        then(articleCommandApi).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 존재하지_않는_기사의_댓글은_조회할_수_없다() {
+        UUID articleId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(false);
+
+        assertThatThrownBy(() -> commentService.readAll(articleId, new CursorRequest(null, null, 10)))
+                .isInstanceOf(CommentArticleNotFoundException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
     }
 }

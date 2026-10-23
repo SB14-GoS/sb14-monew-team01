@@ -6,4 +6,6 @@ import org.springframework.stereotype.Component;
 @Component
 public interface UserQueryApi {
     UserSummary getSummary(UUID userId);
+
+    boolean exists(UUID userId);
 }
