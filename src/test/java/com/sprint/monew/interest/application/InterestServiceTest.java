@@ -9,10 +9,15 @@ import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.interest.domain.Interest;
 import com.sprint.monew.interest.domain.InterestRepository;
+import com.sprint.monew.interest.domain.SubscriptionRepository;
+import com.sprint.monew.interest.domain.exception.InterestNotFoundException;
 import com.sprint.monew.interest.domain.exception.SimilarInterestNameException;
 import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
+import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +30,9 @@ class InterestServiceTest {
 
     @Mock
     private InterestRepository interestRepository;
+
+    @Mock
+    private SubscriptionRepository subscriptionRepository;
 
     @InjectMocks
     private InterestService interestService;
@@ -64,5 +72,37 @@ class InterestServiceTest {
                 .isInstanceOf(SimilarInterestNameException.class);
 
         verify(interestRepository, never()).save(any(Interest.class));
+    }
+
+    @Test
+    @DisplayName("관심사 키워드 수정 성공 - 이름은 유지되고 키워드 목록만 새로운 값으로 교체된다")
+    void updateInterest_Success() {
+        // given
+        UUID interestId = UUID.randomUUID();
+        Interest existing = new Interest("백엔드", List.of("자바", "스프링"));
+        InterestUpdateRequest request = new InterestUpdateRequest(List.of("도커", "쿠버네티스"));
+
+        given(interestRepository.findById(interestId)).willReturn(Optional.of(existing));
+
+        // when
+        InterestDto result = interestService.updateInterest(interestId, request);
+
+        // then
+        assertThat(result.name()).isEqualTo("백엔드");
+        assertThat(result.keywords()).containsExactly("도커", "쿠버네티스");
+    }
+
+    @Test
+    @DisplayName("관심사 키워드 수정 실패 - 존재하지 않는 관심사 ID면 InterestNotFoundException이 발생한다")
+    void updateInterest_Fail_NotFound() {
+        // given
+        UUID nonExistentId = UUID.randomUUID();
+        InterestUpdateRequest request = new InterestUpdateRequest(List.of("키워드"));
+
+        given(interestRepository.findById(nonExistentId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> interestService.updateInterest(nonExistentId, request))
+                .isInstanceOf(InterestNotFoundException.class);
     }
 }
