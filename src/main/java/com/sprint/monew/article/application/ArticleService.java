@@ -4,6 +4,7 @@ import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
+import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.ArticleView;
 import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
@@ -19,6 +20,7 @@ import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,6 +102,12 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
 
         return new CursorPageResponse<>(
                 content, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
+    }
+
+    /* 출처 목록 반환 */
+    public List<ArticleSource> getSourceList() {
+        List<ArticleSource> result = Arrays.stream(ArticleSource.values()).toList();
+        return result;
     }
 
     private ArticleSearchCursor validateCondition(ArticleSearchCondition condition) {
