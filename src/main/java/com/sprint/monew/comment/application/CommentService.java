@@ -48,6 +48,7 @@ public class CommentService {
         return new CommentCreatedEvent(comment.getId(), comment.getArticleId(), comment.getUserId());
     }
 
+    @Transactional(readOnly = true)
     public CursorPageResponse<CommentDto> readAll(UUID articleId, CursorRequest request) {
 
         List<CommentDto> comments = commentRepository.findByArticleId(articleId, request).stream()
