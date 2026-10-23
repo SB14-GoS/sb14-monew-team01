@@ -37,15 +37,24 @@ public class CommentService {
         }
 
         UserSummary user = userQueryApi.getSummary(userId);
+        String articleTitle = articleQueryApi.getTitle(articleId);
 
         Comment comment = commentRepository.save(new Comment(articleId, userId, content));
         articleCommandApi.increaseCommentCount(articleId);
-        eventPublisher.publishEvent(new CommentCreatedEvent(comment.getId(), articleId, userId));
+        eventPublisher.publishEvent(toCreatedEvent(comment, articleTitle, user.nickname()));
 
         return CommentDto.from(comment, user.nickname(), false);
     }
 
-    private CommentCreatedEvent toCreatedEvent(Comment comment) {
-        return new CommentCreatedEvent(comment.getId(), comment.getArticleId(), comment.getUserId());
+    private CommentCreatedEvent toCreatedEvent(Comment comment, String articleTitle, String userNickname) {
+        return new CommentCreatedEvent(
+                comment.getId(),
+                comment.getArticleId(),
+                articleTitle,
+                comment.getUserId(),
+                userNickname,
+                comment.getContent(),
+                comment.getLikeCount(),
+                comment.getCreatedAt());
     }
 }
