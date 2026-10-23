@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -125,6 +126,24 @@ public class GlobalExceptionHandler {
                 Map.of(),
                 e.getClass().getSimpleName(),
                 errorCode.getStatus().value());
+        return ResponseEntity.status(errorCode.getStatus()).body(errorResponse);
+    }
+
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrencyFailureException(ConcurrencyFailureException e) {
+        ErrorCode errorCode = CommonErrorCode.CONCURRENCY_CONFLICT;
+
+        log.atLevel(errorCode.getLevel())
+                .log("동시성 충돌 발생 - exceptionType: {}", e.getClass().getSimpleName());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now(),
+                errorCode.toString(),
+                errorCode.getMessage(),
+                Map.of(),
+                e.getClass().getSimpleName(),
+                errorCode.getStatus().value());
+
         return ResponseEntity.status(errorCode.getStatus()).body(errorResponse);
     }
 }

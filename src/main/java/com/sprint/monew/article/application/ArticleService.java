@@ -4,6 +4,7 @@ import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
+import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.ArticleView;
 import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
@@ -19,6 +20,7 @@ import com.sprint.monew.global.exception.CommonErrorCode;
 import com.sprint.monew.global.exception.MonewException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,11 +44,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
             throw new UserIdRequiredException();
         }
         /* 조회했을때 없는얘량 논리삭제된얘 예외던지기 */
-        Article article =
-                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
-        if (article.isDeleted()) {
-            throw new ArticleNotFoundException(articleId);
-        }
+        Article article = findActiveArticle(articleId);
 
         /* 요청받은 유저가 읽었는지 안읽었는지 */
         Optional<ArticleView> articleView = articleViewRepository.findByArticleIdAndUserId(articleId, userId);
@@ -100,6 +98,12 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
 
         return new CursorPageResponse<>(
                 content, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
+    }
+
+    /* 출처 목록 반환 */
+    public List<ArticleSource> getSourceList() {
+        List<ArticleSource> result = Arrays.stream(ArticleSource.values()).toList();
+        return result;
     }
 
     private ArticleSearchCursor validateCondition(ArticleSearchCondition condition) {
@@ -175,6 +179,12 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         return !result;
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public String getTitle(UUID articleId) {
+        return findActiveArticle(articleId).getTitle();
+    }
+
     @Transactional
     @Override
     public void increaseCommentCount(UUID articleId) {
@@ -185,5 +195,13 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         if (updated == 0) {
             throw new ArticleNotFoundException(articleId);
         }
+    }
+
+    /* 존재하지 않고, 논리삭제된애들 거르기 */
+    private Article findActiveArticle(UUID articleId) {
+        return articleRepository
+                .findById(articleId)
+                .filter(article -> !article.isDeleted())
+                .orElseThrow(() -> new ArticleNotFoundException(articleId));
     }
 }
