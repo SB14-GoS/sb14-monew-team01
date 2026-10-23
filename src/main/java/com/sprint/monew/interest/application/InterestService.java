@@ -6,9 +6,11 @@ import com.sprint.monew.interest.api.InterestSummary;
 import com.sprint.monew.interest.domain.Interest;
 import com.sprint.monew.interest.domain.InterestRepository;
 import com.sprint.monew.interest.domain.SubscriptionRepository;
+import com.sprint.monew.interest.domain.exception.InterestNotFoundException;
 import com.sprint.monew.interest.domain.exception.SimilarInterestNameException;
 import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
+import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +36,16 @@ public class InterestService implements InterestQueryApi {
         return InterestDto.from(savedInterest, false);
     }
 
+    @Transactional
+    public InterestDto updateInterest(UUID interestId, InterestUpdateRequest request) {
+        Interest interest = findInterestOrThrow(interestId);
+        interest.updateKeywords(request.keywords());
+        return InterestDto.from(interest, false);
+    }
+
     // ========================================================================================
     // 다른 모듈과 통신하기 위한 InterestQueryApi 구현체
+
     @Override
     public List<InterestKeywordInfo> getAllKeywords() {
         return interestRepository.findAllWithKeywords().stream()
@@ -58,6 +68,7 @@ public class InterestService implements InterestQueryApi {
 
     // ========================================================================================
     // 내부 헬퍼 메서드
+
     private void validateNameSimilarity(String newName) {
         List<Interest> existingInterests = interestRepository.findAll();
         for (Interest existing : existingInterests) {
@@ -81,6 +92,7 @@ public class InterestService implements InterestQueryApi {
     }
 
     // 동적 계획법을 이용한 두 문자열 간의 최소 편입 거리를 구하는 메서드
+
     private int levenshteinDistance(String s1, String s2) {
         int[][] dp = new int[s1.length() + 1][s2.length() + 1];
         for (int i = 0; i <= s1.length(); i++) {
@@ -97,5 +109,9 @@ public class InterestService implements InterestQueryApi {
             }
         }
         return dp[s1.length()][s2.length()];
+    }
+
+    private Interest findInterestOrThrow(UUID interestId) {
+        return interestRepository.findById(interestId).orElseThrow(() -> new InterestNotFoundException(interestId));
     }
 }
