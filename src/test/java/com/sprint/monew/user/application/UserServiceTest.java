@@ -49,7 +49,7 @@ public class UserServiceTest {
         UserRegisterRequest request = new UserRegisterRequest("woody@monew.com", "우디", "monew1!");
         given(userRepository.existsByEmail("woody@monew.com")).willReturn(false);
         given(passwordEncoder.encode("monew1!")).willReturn("encoded-password");
-        given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArguments(0));
+        given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         UserDto result = userService.register(request);
 
