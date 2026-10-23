@@ -6,6 +6,8 @@ import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,19 @@ public class UserService {
             throw new EmailDuplicatedException(request.email());
         }
         String encodedPassword = passwordEncoder.encode(request.password());
-        User user = userRepository.save(new User(request.email(), request.nickname(), encodedPassword));
-        return UserDto.from(user);
+        try {
+            User user = userRepository.saveAndFlush(new User(request.email(), request.nickname(), encodedPassword));
+            return UserDto.from(user);
+        } catch (DataIntegrityViolationException e) {
+            if (isEmailUniqueViolation(e)) {
+                throw new EmailDuplicatedException(request.email());
+            }
+            throw e;
+        }
+    }
+
+    private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
+        return e.getCause() instanceof ConstraintViolationException violationException
+                && User.EMAIL_UNIQUE_CONSTRAINT.equalsIgnoreCase(violationException.getConstraintName());
     }
 }
