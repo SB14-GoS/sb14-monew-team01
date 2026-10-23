@@ -15,4 +15,7 @@ public interface InterestApiDocs {
 
     @Operation(summary = "관심사 수정")
     ResponseEntity<InterestDto> updateInterest(UUID interestId, InterestUpdateRequest request);
+
+    @Operation(summary = "관심사 삭제")
+    ResponseEntity<Void> deleteInterest(UUID interestId);
 }
