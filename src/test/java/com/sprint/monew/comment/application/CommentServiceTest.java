@@ -47,6 +47,7 @@ class CommentServiceTest {
         UUID articleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         given(articleQueryApi.exists(articleId)).willReturn(true);
+        given(userQueryApi.exists(userId)).willReturn(true);
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "댓글작성자"));
         given(commentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
