@@ -1,5 +1,6 @@
 package com.sprint.monew.interest.application;
 
+import com.sprint.monew.interest.api.InterestDeletedEvent;
 import com.sprint.monew.interest.api.InterestKeywordInfo;
 import com.sprint.monew.interest.api.InterestQueryApi;
 import com.sprint.monew.interest.api.InterestSummary;
@@ -14,6 +15,7 @@ import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class InterestService implements InterestQueryApi {
 
     private final InterestRepository interestRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public InterestDto registerInterest(InterestRegisterRequest request) {
@@ -41,6 +44,15 @@ public class InterestService implements InterestQueryApi {
         Interest interest = findInterestOrThrow(interestId);
         interest.updateKeywords(request.keywords());
         return InterestDto.from(interest, false);
+    }
+
+    @Transactional
+    public void deleteInterest(UUID interestId) {
+        Interest interest = findInterestOrThrow(interestId);
+        subscriptionRepository.deleteByInterestId(interestId);
+        interestRepository.delete(interest);
+
+        eventPublisher.publishEvent(new InterestDeletedEvent(interestId));
     }
 
     // ========================================================================================

@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.sprint.monew.interest.api.InterestDeletedEvent;
 import com.sprint.monew.interest.domain.Interest;
 import com.sprint.monew.interest.domain.InterestRepository;
 import com.sprint.monew.interest.domain.SubscriptionRepository;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class InterestServiceTest {
@@ -33,6 +35,9 @@ class InterestServiceTest {
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private InterestService interestService;
@@ -103,6 +108,36 @@ class InterestServiceTest {
 
         // when & then
         assertThatThrownBy(() -> interestService.updateInterest(nonExistentId, request))
+                .isInstanceOf(InterestNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("관심사 물리 삭제 성공 - 구독 내역 삭제 후 관심사가 삭제되고 삭제 이벤트가 발행된다")
+    void deleteInterest_Success() {
+        // given
+        UUID interestId = UUID.randomUUID();
+        Interest existing = new Interest("스포츠", List.of("축구"));
+
+        given(interestRepository.findById(interestId)).willReturn(Optional.of(existing));
+
+        // when
+        interestService.deleteInterest(interestId);
+
+        // then
+        verify(subscriptionRepository).deleteByInterestId(interestId);
+        verify(interestRepository).delete(existing);
+        verify(eventPublisher).publishEvent(new InterestDeletedEvent(interestId));
+    }
+
+    @Test
+    @DisplayName("관심사 물리 삭제 실패 - 존재하지 않는 관심사 ID면 InterestNotFoundException이 발생한다")
+    void deleteInterest_Fail_NotFound() {
+        // given
+        UUID nonExistentId = UUID.randomUUID();
+        given(interestRepository.findById(nonExistentId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> interestService.deleteInterest(nonExistentId))
                 .isInstanceOf(InterestNotFoundException.class);
     }
 }
