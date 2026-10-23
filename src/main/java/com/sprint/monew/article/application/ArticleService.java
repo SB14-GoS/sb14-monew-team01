@@ -175,6 +175,17 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         return !result;
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public String getTitle(UUID articleId) {
+        Article target =
+                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
+        if (target.isDeleted()) {
+            throw new ArticleNotFoundException(articleId);
+        }
+        return target.getTitle();
+    }
+
     @Transactional
     @Override
     public void increaseCommentCount(UUID articleId) {
