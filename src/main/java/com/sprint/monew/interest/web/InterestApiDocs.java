@@ -5,6 +5,7 @@ import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
 import com.sprint.monew.interest.web.dto.InterestSearchRequest;
 import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
+import com.sprint.monew.interest.web.dto.SubscriptionDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
@@ -23,4 +24,10 @@ public interface InterestApiDocs {
 
     @Operation(summary = "관심사 목록 조회")
     ResponseEntity<CursorPageResponse<InterestDto>> getInterest(InterestSearchRequest request, UUID userId);
+
+    @Operation(summary = "관심사 구독")
+    ResponseEntity<SubscriptionDto> subscribeInterest(UUID interestId, UUID userId);
+
+    @Operation(summary = "관심사 구독 취소")
+    ResponseEntity<Void> unsubscribeInterest(UUID interestId, UUID userId);
 }
