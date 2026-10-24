@@ -7,17 +7,23 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.sprint.monew.global.common.CursorPageResponse;
+import com.sprint.monew.global.common.SortDirection;
 import com.sprint.monew.interest.api.InterestDeletedEvent;
 import com.sprint.monew.interest.domain.Interest;
+import com.sprint.monew.interest.domain.InterestQueryRepository;
 import com.sprint.monew.interest.domain.InterestRepository;
 import com.sprint.monew.interest.domain.SubscriptionRepository;
 import com.sprint.monew.interest.domain.exception.InterestNotFoundException;
+import com.sprint.monew.interest.domain.exception.InvalidInterestOrderByException;
 import com.sprint.monew.interest.domain.exception.SimilarInterestNameException;
 import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
+import com.sprint.monew.interest.web.dto.InterestSearchRequest;
 import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,12 +32,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InterestServiceTest {
 
     @Mock
     private InterestRepository interestRepository;
+
+    @Mock
+    private InterestQueryRepository interestQueryRepository;
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
@@ -139,5 +149,46 @@ class InterestServiceTest {
         // when & then
         assertThatThrownBy(() -> interestService.deleteInterest(nonExistentId))
                 .isInstanceOf(InterestNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("관심사 목록 조회 성공 - 구독 여부가 포함된 커서 페이지 응답을 반환한다")
+    void getInterests_Success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID interestId = UUID.randomUUID();
+        Interest interest = new Interest("스포츠", List.of("축구", "야구"));
+        ReflectionTestUtils.setField(interest, "id", interestId);
+
+        InterestSearchRequest request = new InterestSearchRequest("스포", "name", SortDirection.ASC, null, null, 10);
+
+        given(interestQueryRepository.search(request.toCondition(), request.toCursor()))
+                .willReturn(List.of(interest));
+        given(interestQueryRepository.countByCondition(request.toCondition())).willReturn(1L);
+        given(subscriptionRepository.findSubscribedInterestIds(userId, List.of(interestId)))
+                .willReturn(Set.of(interestId));
+
+        // when
+        CursorPageResponse<InterestDto> result = interestService.getInterests(request, userId);
+
+        // then
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).name()).isEqualTo("스포츠");
+        assertThat(result.content().get(0).subscribedByMe()).isTrue();
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.totalElements()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("관심사 목록 조회 실패 - 지원하지 않는 정렬 기준이면 InvalidInterestOrderByException이 발생한다")
+    void getInterests_Fail_InvalidOrderBy() {
+        // given
+        UUID userId = UUID.randomUUID();
+        InterestSearchRequest request =
+                new InterestSearchRequest(null, "invalidField", SortDirection.ASC, null, null, 10);
+
+        // when & then
+        assertThatThrownBy(() -> interestService.getInterests(request, userId))
+                .isInstanceOf(InvalidInterestOrderByException.class);
     }
 }
