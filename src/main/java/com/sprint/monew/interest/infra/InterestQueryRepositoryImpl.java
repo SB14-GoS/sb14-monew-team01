@@ -5,6 +5,7 @@ import static com.sprint.monew.interest.domain.QInterestKeyword.interestKeyword;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sprint.monew.global.common.SortDirection;
@@ -73,42 +74,69 @@ public class InterestQueryRepositoryImpl implements InterestQueryRepository {
     }
 
     private BooleanExpression cursorAfter(InterestSearchCursor cursor) {
-        if (cursor == null || !StringUtils.hasText(cursor.cursor()) || cursor.after() == null) {
+        if (cursor == null) {
             return null;
         }
-        boolean isAsc = cursor.direction() == SortDirection.ASC;
 
-        if ("subscriberCount".equals(cursor.orderBy())) {
-            long cursorCount = parseSubscriberCountCursor(cursor.cursor());
-            return isAsc
-                    ? interest.subscriberCount
-                            .gt(cursorCount)
-                            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.gt(cursor.after())))
-                    : interest.subscriberCount
-                            .lt(cursorCount)
-                            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(cursor.after())));
+        boolean hasCursor = StringUtils.hasText(cursor.cursor());
+        boolean hasAfter = cursor.after() != null;
+
+        if (!hasCursor && !hasAfter) {
+            return null;
         }
 
-        return isAsc
-                ? interest.name
-                        .gt(cursor.cursor())
-                        .or(interest.name.eq(cursor.cursor()).and(interest.createdAt.gt(cursor.after())))
-                : interest.name
-                        .lt(cursor.cursor())
-                        .or(interest.name.eq(cursor.cursor()).and(interest.createdAt.lt(cursor.after())));
+        if (!hasCursor || !hasAfter) {
+            throw new MonewException(
+                    CommonErrorCode.INCORRECT_REQUEST, Map.of("cursor/after", "must be provided together"));
+        }
+
+        boolean ascending = cursor.direction() == SortDirection.ASC;
+
+        if ("subscriberCount".equals(cursor.orderBy())) {
+            ParsedSubscriberCursor parsed = parseSubscriberCountCursor(cursor.cursor());
+
+            BooleanExpression idAfter = ascending ? interest.id.gt(parsed.id()) : interest.id.lt(parsed.id());
+
+            BooleanExpression createdAfter = (ascending
+                            ? interest.createdAt.gt(cursor.after())
+                            : interest.createdAt.lt(cursor.after()))
+                    .or(interest.createdAt.eq(cursor.after()).and(idAfter));
+
+            return countAfter(interest.subscriberCount, parsed.count(), ascending, createdAfter);
+        }
+
+        BooleanExpression createdAfterForName =
+                ascending ? interest.createdAt.gt(cursor.after()) : interest.createdAt.lt(cursor.after());
+
+        BooleanExpression nameBeyond =
+                ascending ? interest.name.gt(cursor.cursor()) : interest.name.lt(cursor.cursor());
+
+        return nameBeyond.or(interest.name.eq(cursor.cursor()).and(createdAfterForName));
     }
 
-    private long parseSubscriberCountCursor(String cursorString) {
+    private BooleanExpression countAfter(
+            NumberPath<Long> field, long value, boolean ascending, BooleanExpression createdAfter) {
+        BooleanExpression beyond = ascending ? field.gt(value) : field.lt(value);
+        return beyond.or(field.eq(value).and(createdAfter));
+    }
+
+    private record ParsedSubscriberCursor(long count, UUID id) {}
+
+    private ParsedSubscriberCursor parseSubscriberCountCursor(String cursorString) {
         try {
-            return Long.parseLong(cursorString);
-        } catch (NumberFormatException e) {
+            String[] parts = cursorString.split("_");
+            if (parts.length != 2) {
+                throw new IllegalArgumentException();
+            }
+            return new ParsedSubscriberCursor(Long.parseLong(parts[0]), UUID.fromString(parts[1]));
+        } catch (Exception e) {
             throw new MonewException(CommonErrorCode.INCORRECT_REQUEST, Map.of("cursor", cursorString));
         }
     }
 
     private OrderSpecifier<?>[] orderBy(InterestSearchCursor cursor) {
         if (cursor == null) {
-            return new OrderSpecifier<?>[] {interest.createdAt.desc()};
+            return new OrderSpecifier<?>[] {interest.createdAt.desc(), interest.id.desc()};
         }
 
         boolean isAsc = cursor.direction() == SortDirection.ASC;
@@ -116,6 +144,10 @@ public class InterestQueryRepositoryImpl implements InterestQueryRepository {
                 ? (isAsc ? interest.subscriberCount.asc() : interest.subscriberCount.desc())
                 : (isAsc ? interest.name.asc() : interest.name.desc());
 
-        return new OrderSpecifier<?>[] {primary, isAsc ? interest.createdAt.asc() : interest.createdAt.desc()};
+        return new OrderSpecifier<?>[] {
+            primary,
+            isAsc ? interest.createdAt.asc() : interest.createdAt.desc(),
+            isAsc ? interest.id.asc() : interest.id.desc()
+        };
     }
 }
