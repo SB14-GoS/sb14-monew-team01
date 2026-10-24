@@ -168,7 +168,7 @@ public class InterestService implements InterestQueryApi {
 
     private String cursorOf(Interest interest, String orderBy) {
         if ("subscriberCount".equals(orderBy)) {
-            return String.valueOf(interest.getSubscriberCount());
+            return interest.getSubscriberCount() + "_" + interest.getId();
         }
         return interest.getName();
     }
