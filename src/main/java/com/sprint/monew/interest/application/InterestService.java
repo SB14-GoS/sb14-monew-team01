@@ -1,18 +1,25 @@
 package com.sprint.monew.interest.application;
 
+import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.interest.api.InterestDeletedEvent;
 import com.sprint.monew.interest.api.InterestKeywordInfo;
 import com.sprint.monew.interest.api.InterestQueryApi;
 import com.sprint.monew.interest.api.InterestSummary;
 import com.sprint.monew.interest.domain.Interest;
+import com.sprint.monew.interest.domain.InterestQueryRepository;
 import com.sprint.monew.interest.domain.InterestRepository;
+import com.sprint.monew.interest.domain.InterestSearchCondition;
+import com.sprint.monew.interest.domain.InterestSearchCursor;
 import com.sprint.monew.interest.domain.SubscriptionRepository;
 import com.sprint.monew.interest.domain.exception.InterestNotFoundException;
+import com.sprint.monew.interest.domain.exception.InvalidInterestOrderByException;
 import com.sprint.monew.interest.domain.exception.SimilarInterestNameException;
 import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
+import com.sprint.monew.interest.web.dto.InterestSearchRequest;
 import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class InterestService implements InterestQueryApi {
 
     private static final double SIMILARITY_THRESHOLD = 0.8;
+    private static final Set<String> ALLOWED_ORDER_BY = Set.of("name", "subscriberCount");
 
     private final InterestRepository interestRepository;
+    private final InterestQueryRepository interestQueryRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -53,6 +62,37 @@ public class InterestService implements InterestQueryApi {
         interestRepository.delete(interest);
 
         eventPublisher.publishEvent(new InterestDeletedEvent(interestId));
+    }
+
+    public CursorPageResponse<InterestDto> getInterests(InterestSearchRequest request, UUID userId) {
+        if (!ALLOWED_ORDER_BY.contains(request.orderBy())) {
+            throw new InvalidInterestOrderByException(request.orderBy());
+        }
+
+        InterestSearchCondition condition = request.toCondition();
+        InterestSearchCursor cursor = request.toCursor();
+
+        List<Interest> interests = interestQueryRepository.search(condition, cursor);
+        long totalElements = interestQueryRepository.countByCondition(condition);
+
+        CursorPageResponse<Interest> page = CursorPageResponse.of(
+                interests,
+                request.limit(),
+                totalElements,
+                last -> cursorOf(last, request.orderBy()),
+                Interest::getCreatedAt);
+
+        List<UUID> interestIds = page.content().stream().map(Interest::getId).toList();
+        Set<UUID> subscribedIds = interestIds.isEmpty()
+                ? Set.of()
+                : subscriptionRepository.findSubscribedInterestIds(userId, interestIds);
+
+        List<InterestDto> dtoContent = page.content().stream()
+                .map(interest -> InterestDto.from(interest, subscribedIds.contains(interest.getId())))
+                .toList();
+
+        return new CursorPageResponse<>(
+                dtoContent, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
     }
 
     // ========================================================================================
@@ -104,7 +144,6 @@ public class InterestService implements InterestQueryApi {
     }
 
     // 동적 계획법을 이용한 두 문자열 간의 최소 편입 거리를 구하는 메서드
-
     private int levenshteinDistance(String s1, String s2) {
         int[][] dp = new int[s1.length() + 1][s2.length() + 1];
         for (int i = 0; i <= s1.length(); i++) {
@@ -125,5 +164,12 @@ public class InterestService implements InterestQueryApi {
 
     private Interest findInterestOrThrow(UUID interestId) {
         return interestRepository.findById(interestId).orElseThrow(() -> new InterestNotFoundException(interestId));
+    }
+
+    private String cursorOf(Interest interest, String orderBy) {
+        if ("subscriberCount".equals(orderBy)) {
+            return String.valueOf(interest.getSubscriberCount());
+        }
+        return interest.getName();
     }
 }
