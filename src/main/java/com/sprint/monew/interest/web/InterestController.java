@@ -61,16 +61,16 @@ public class InterestController implements InterestApiDocs {
     }
 
     @Override
-    @PostMapping("/{interestId}/subciptions")
+    @PostMapping("/{interestId}/subcriptions")
     public ResponseEntity<SubscriptionDto> subscribeInterest(
             @PathVariable UUID interestId, @RequestUserId UUID userId) {
         return ResponseEntity.ok(subscriptionService.subscribeInterest(interestId, userId));
     }
 
     @Override
-    @DeleteMapping("/{interestId}/subciptions")
+    @DeleteMapping("/{interestId}/subcriptions")
     public ResponseEntity<Void> unsubscribeInterest(@PathVariable UUID interestId, @RequestUserId UUID userId) {
         subscriptionService.unsubscribeInterest(interestId, userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }
