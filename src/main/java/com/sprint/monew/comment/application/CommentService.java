@@ -52,7 +52,7 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<CommentDto> readAll(UUID articleId, CursorRequest request) {
+    public CursorPageResponse<CommentDto> search(UUID articleId, CursorRequest request) {
         if (!articleQueryApi.exists(articleId)) {
             throw new CommentArticleNotFoundException(articleId);
         }
