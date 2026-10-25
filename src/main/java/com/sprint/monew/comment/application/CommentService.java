@@ -4,12 +4,14 @@ import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
+import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
+import com.sprint.monew.global.common.SortDirection;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.List;
@@ -62,18 +64,23 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<CommentDto> search(UUID articleId, CursorRequest request) {
+    public CursorPageResponse<CommentDto> search(
+            UUID articleId, UUID requesterId, String orderBy, SortDirection direction, CursorRequest request) {
         if (!articleQueryApi.exists(articleId)) {
             throw new CommentArticleNotFoundException(articleId);
         }
+        CommentOrderBy commentOrderBy = CommentOrderBy.from(orderBy);
 
-        List<CommentDto> comments = commentRepository.findByArticleId(articleId, request).stream()
-                .map(comment -> CommentDto.from(
-                        comment,
-                        userQueryApi.getSummary(comment.getUserId()).nickname(), // n+1 문제가 생성됨.
-                        false // 임시 false
-                        ))
-                .toList();
+        List<CommentDto> comments =
+                commentRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request).stream()
+                        .map(result -> CommentDto.from(
+                                result.comment(),
+                                userQueryApi
+                                        .getSummary(result.comment().getUserId())
+                                        .nickname(), // n+1 문제가 생성됨.
+                                result.likedByMe() // 임시 false
+                                ))
+                        .toList();
 
         long totalCommentCount = commentRepository.countByArticleId(articleId);
 

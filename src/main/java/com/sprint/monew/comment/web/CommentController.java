@@ -5,6 +5,7 @@ import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.comment.web.dto.CommentRegisterRequest;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
+import com.sprint.monew.global.common.SortDirection;
 import com.sprint.monew.global.web.RequestUserId;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -23,6 +24,7 @@ public class CommentController implements CommentApiDocs {
     private final CommentService commentService;
 
     @PostMapping("api/comments")
+    @Override
     public ResponseEntity<CommentDto> register(
             @RequestUserId UUID userId, @Valid @RequestBody CommentRegisterRequest request) {
         CommentDto commentDto = commentService.register(request.articleId(), userId, request.content());
@@ -30,9 +32,17 @@ public class CommentController implements CommentApiDocs {
     }
 
     @GetMapping("api/comments")
+    @Override
     public ResponseEntity<CursorPageResponse<CommentDto>> readAll(
-            @RequestParam UUID articleId, @Valid @ModelAttribute CursorRequest request) {
-        CursorPageResponse<CommentDto> readAll = commentService.search(articleId, request);
-        return ResponseEntity.ok(readAll);
+            @RequestUserId UUID requesterId,
+            @RequestParam UUID articleId,
+            @RequestParam String orderBy,
+            @RequestParam SortDirection direction,
+            @Valid @ModelAttribute CursorRequest request) {
+
+        CursorPageResponse<CommentDto> response =
+                commentService.search(articleId, requesterId, orderBy, direction, request);
+
+        return ResponseEntity.ok(response);
     }
 }
