@@ -10,6 +10,7 @@ import com.sprint.monew.comment.domain.CommentQueryRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.QComment;
 import com.sprint.monew.comment.domain.QCommentLike;
+import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
 import java.time.Instant;
@@ -68,8 +69,14 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     private BooleanExpression cursorCondition(
             QComment comment, UUID articleId, CursorRequest request, CommentOrderBy orderBy, SortDirection direction) {
 
-        if (request.cursor() == null) {
+        // 첫 페이지
+        if (request.cursor() == null && request.after() == null) {
             return null;
+        }
+
+        // cursor / after 중 하나만 온 잘못된 요청
+        if (request.cursor() == null || request.after() == null) {
+            throw new InvalidCommentCursorException(request.cursor());
         }
 
         return switch (orderBy) {
@@ -99,11 +106,11 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     private BooleanExpression likeCountCursorCondition(
             QComment comment, UUID articleId, CursorRequest request, SortDirection direction) {
 
-        if (request.cursor() == null) {
+        if (request.cursor() == null || request.after() == null) {
             return null;
         }
 
-        UUID cursorId = UUID.fromString(request.cursor());
+        UUID cursorId = parseCursorId(request.cursor());
 
         Comment cursorComment = queryFactory
                 .selectFrom(comment)
@@ -112,7 +119,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
 
         // 실제 구현에서는 없을 때 예외 처리
         if (cursorComment == null) {
-            throw new IllegalArgumentException("유효하지 않은 cursor입니다.");
+            throw new InvalidCommentCursorException(request.cursor());
         }
 
         long cursorLikeCount = cursorComment.getLikeCount();
@@ -130,16 +137,24 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     private BooleanExpression createdAtCursorCondition(
             QComment comment, CursorRequest request, SortDirection direction) {
 
-        if (request.after() == null) {
+        if (request.after() == null || request.cursor() == null) {
             return null;
         }
 
-        UUID cursorId = UUID.fromString(request.cursor());
+        UUID cursorId = parseCursorId(request.cursor());
         Instant after = request.after();
         boolean asc = direction == SortDirection.ASC;
 
         return asc
                 ? comment.createdAt.gt(after).or(comment.createdAt.eq(after).and(comment.id.gt(cursorId)))
                 : comment.createdAt.lt(after).or(comment.createdAt.eq(after).and(comment.id.lt(cursorId)));
+    }
+
+    private UUID parseCursorId(String cursor) {
+        try {
+            return UUID.fromString(cursor);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidCommentCursorException(cursor);
+        }
     }
 }
