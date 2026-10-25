@@ -1,20 +1,30 @@
 package com.sprint.monew.comment.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
+import com.sprint.monew.comment.domain.Comment;
+import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
+import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
+import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorRequest;
+import com.sprint.monew.global.common.SortDirection;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,9 +115,86 @@ class CommentServiceTest {
         UUID articleId = UUID.randomUUID();
         given(articleQueryApi.exists(articleId)).willReturn(false);
 
-        assertThatThrownBy(() -> commentService.search(articleId, new CursorRequest(null, null, 10)))
+        assertThatThrownBy(() -> commentService.search(
+                        articleId,
+                        UUID.randomUUID(),
+                        "createdAt",
+                        SortDirection.ASC,
+                        new CursorRequest(null, null, 10)))
                 .isInstanceOf(CommentArticleNotFoundException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 댓글_목록을_조회하면_정렬_조건과_요청자_ID를_전달하고_커서_응답을_만든다() {
+        UUID articleId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        UUID firstUserId = UUID.randomUUID();
+        UUID secondUserId = UUID.randomUUID();
+        UUID thirdUserId = UUID.randomUUID();
+        Instant firstCreatedAt = Instant.parse("2026-10-26T01:00:00Z");
+        Instant secondCreatedAt = Instant.parse("2026-10-26T01:01:00Z");
+        Instant thirdCreatedAt = Instant.parse("2026-10-26T01:02:00Z");
+        CursorRequest request = new CursorRequest(null, null, 2);
+
+        Comment firstComment = mockComment(articleId, firstUserId, firstCreatedAt, 10L);
+        Comment secondComment = mockComment(articleId, secondUserId, secondCreatedAt, 5L);
+        Comment thirdComment = mockComment(articleId, thirdUserId, thirdCreatedAt, 1L);
+
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+        given(commentRepository.findByArticleId(
+                        articleId, requesterId, CommentOrderBy.LIKE_COUNT, SortDirection.DESC, request))
+                .willReturn(List.of(
+                        new CommentSearchResult(firstComment, true),
+                        new CommentSearchResult(secondComment, false),
+                        new CommentSearchResult(thirdComment, true)));
+        given(commentRepository.countByArticleId(articleId)).willReturn(3L);
+        given(userQueryApi.getSummary(firstUserId)).willReturn(new UserSummary(firstUserId, "작성자1"));
+        given(userQueryApi.getSummary(secondUserId)).willReturn(new UserSummary(secondUserId, "작성자2"));
+        given(userQueryApi.getSummary(thirdUserId)).willReturn(new UserSummary(thirdUserId, "작성자3"));
+
+        var response = commentService.search(articleId, requesterId, "likeCount", SortDirection.DESC, request);
+
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content()).extracting(CommentDto::likedByMe).containsExactly(true, false);
+        assertThat(response)
+                .extracting(
+                        responseValue -> responseValue.hasNext(),
+                        responseValue -> responseValue.size(),
+                        responseValue -> responseValue.totalElements(),
+                        responseValue -> responseValue.nextCursor(),
+                        responseValue -> responseValue.nextAfter())
+                .containsExactly(true, 2, 3L, secondComment.getId().toString(), secondCreatedAt);
+        then(commentRepository)
+                .should()
+                .findByArticleId(articleId, requesterId, CommentOrderBy.LIKE_COUNT, SortDirection.DESC, request);
+    }
+
+    @Test
+    void 지원하지_않는_정렬_속성으로_댓글을_조회하면_예외가_발생한다() {
+        UUID articleId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+
+        assertThatThrownBy(() -> commentService.search(
+                        articleId,
+                        UUID.randomUUID(),
+                        "unsupported",
+                        SortDirection.ASC,
+                        new CursorRequest(null, null, 10)))
+                .isInstanceOf(InvalidCommentOrderByException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
+    }
+
+    private Comment mockComment(UUID articleId, UUID userId, Instant createdAt, long likeCount) {
+        Comment comment = mock(Comment.class);
+        given(comment.getId()).willReturn(UUID.randomUUID());
+        given(comment.getArticleId()).willReturn(articleId);
+        given(comment.getUserId()).willReturn(userId);
+        given(comment.getContent()).willReturn("댓글 내용");
+        given(comment.getLikeCount()).willReturn(likeCount);
+        given(comment.getCreatedAt()).willReturn(createdAt);
+        return comment;
     }
 }
