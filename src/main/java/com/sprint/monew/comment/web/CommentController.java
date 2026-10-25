@@ -32,7 +32,7 @@ public class CommentController implements CommentApiDocs {
     @GetMapping("api/comments")
     public ResponseEntity<CursorPageResponse<CommentDto>> readAll(
             @RequestParam UUID articleId, @Valid @ModelAttribute CursorRequest request) {
-        CursorPageResponse<CommentDto> readAll = commentService.readAll(articleId, request);
+        CursorPageResponse<CommentDto> readAll = commentService.search(articleId, request);
         return ResponseEntity.ok(readAll);
     }
 }
