@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.sprint.monew.user.application.UserService;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
+import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.web.dto.UserDto;
 import java.time.Instant;
 import java.util.UUID;
@@ -67,5 +68,35 @@ public class UserControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EMAIL_DUPLICATED"));
+    }
+
+    @Test
+    @DisplayName("로그인에 성공하면 200과 사용자 정보를 반환한다")
+    void login() throws Exception {
+        UserDto userDto = new UserDto(UUID.randomUUID(), "woody@monew.com", "우디", Instant.now());
+        given(userService.login(any())).willReturn(userDto);
+
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "woody@monew.com", "password": "monew1!"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("woody@monew.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("로그인에 실패하면 401을 반환한다")
+    void loginFailed() throws Exception {
+        given(userService.login(any())).willThrow(new LoginFailedException());
+
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "woody@monew.com", "password": "wrong!!"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
     }
 }
