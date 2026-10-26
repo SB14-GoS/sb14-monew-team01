@@ -1,6 +1,7 @@
 package com.sprint.monew.comment.domain;
 
 import com.sprint.monew.comment.domain.exception.ArticleIdRequiredException;
+import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentUserIdRequiredException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentContentException;
 import com.sprint.monew.global.common.BaseSoftDeleteEntity;
@@ -55,5 +56,20 @@ public class Comment extends BaseSoftDeleteEntity {
         this.userId = userId;
         this.content = content;
         this.likeCount = 0L;
+    }
+
+    public void updateContent(UUID userId, String content) {
+        if (userId == null) {
+            throw new CommentUserIdRequiredException();
+        }
+
+        if (!this.userId.equals(userId)) {
+            throw new CommentAccessDeniedException(getId(), userId);
+        }
+
+        if (content == null || content.isBlank() || content.length() > 500) {
+            throw new InvalidCommentContentException(content);
+        }
+        this.content = content;
     }
 }
