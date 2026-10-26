@@ -21,4 +21,10 @@ public interface ArticleApiDocs {
 
     @Operation(summary = "뉴스 기사 수집 출처 목록 조회", description = "서비스가 수집하는 전체 출처 목록을 반환합니다.")
     ResponseEntity<List<ArticleSource>> getSourceList();
+
+    @Operation(summary = "뉴스 기사 논리 삭제")
+    ResponseEntity<Void> delete(UUID articleId);
+
+    @Operation(summary = "뉴스 기사 물리 삭제")
+    ResponseEntity<Void> deleteHard(UUID articleId);
 }
