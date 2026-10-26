@@ -100,6 +100,13 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
                 content, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
     }
 
+    @Transactional
+    public void delete(UUID articleId) {
+        Article target =
+                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
+        target.softDelete(); /* Dirty checking */
+    }
+
     /* 출처 목록 반환 */
     public List<ArticleSource> getSourceList() {
         List<ArticleSource> result = Arrays.stream(ArticleSource.values()).toList();
