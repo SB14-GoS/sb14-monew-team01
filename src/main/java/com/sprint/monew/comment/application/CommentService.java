@@ -2,7 +2,6 @@ package com.sprint.monew.comment.application;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
-import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
@@ -48,7 +47,11 @@ public class CommentService {
 
         UserSummary user = userQueryApi.getSummary(userId);
 
-        String articleTitle = getArticleTitle(articleId);
+        if (!articleQueryApi.exists(articleId)) {
+            throw new CommentArticleNotFoundException(articleId);
+        }
+
+        String articleTitle = articleQueryApi.getTitle(articleId);
 
         Comment comment = commentRepository.save(new Comment(articleId, userId, content));
         articleCommandApi.increaseCommentCount(articleId);
@@ -115,15 +118,6 @@ public class CommentService {
                 comment.getContent(),
                 comment.getLikeCount(),
                 comment.getCreatedAt());
-    }
-
-    // 기사 제목을 조회하고 없는 기사는 댓글 도메인 예외로 변환한다.
-    private String getArticleTitle(UUID articleId) {
-        try {
-            return articleQueryApi.getTitle(articleId);
-        } catch (ArticleNotFoundException exception) {
-            throw new CommentArticleNotFoundException(articleId);
-        }
     }
 
     // 정렬 기준에 맞는 다음 페이지용 cursor 문자열을 생성한다.

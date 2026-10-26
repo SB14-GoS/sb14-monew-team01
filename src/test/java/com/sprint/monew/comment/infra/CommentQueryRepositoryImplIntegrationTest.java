@@ -129,7 +129,7 @@ class CommentQueryRepositoryImplIntegrationTest {
                     fetched,
                     limit,
                     commentQueryRepository.countByArticleId(articleId),
-                    result -> result.comment().getId().toString(),
+                    result -> cursorOf(result, orderBy),
                     result -> result.comment().getCreatedAt());
 
             all.addAll(page.content());
@@ -142,6 +142,15 @@ class CommentQueryRepositoryImplIntegrationTest {
         }
 
         throw new AssertionError("커서 페이지네이션이 종료되지 않았습니다.");
+    }
+
+    private String cursorOf(CommentSearchResult result, CommentOrderBy orderBy) {
+        Comment comment = result.comment();
+
+        return switch (orderBy) {
+            case CREATED_AT -> comment.getId().toString();
+            case LIKE_COUNT -> comment.getLikeCount() + "_" + comment.getId();
+        };
     }
 
     private Comment saveComment(UUID articleId, Instant createdAt, long likeCount) {

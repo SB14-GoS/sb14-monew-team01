@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
-import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
@@ -66,14 +65,15 @@ class CommentServiceTest {
         UUID userId = UUID.randomUUID();
         given(userQueryApi.exists(userId)).willReturn(true);
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "댓글작성자"));
+        given(articleQueryApi.exists(articleId)).willReturn(true);
         given(articleQueryApi.getTitle(articleId)).willReturn("기사 제목");
         given(commentRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
         var comment = commentService.register(articleId, userId, "좋은 기사네요.");
 
         then(commentRepository).should().save(any());
+        then(articleQueryApi).should().exists(articleId);
         then(articleQueryApi).should().getTitle(articleId);
-        then(articleQueryApi).should(never()).exists(articleId);
         then(articleCommandApi).should().increaseCommentCount(articleId);
         ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -95,14 +95,14 @@ class CommentServiceTest {
         UUID articleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         given(userQueryApi.exists(userId)).willReturn(true);
-        given(articleQueryApi.getTitle(articleId)).willThrow(new ArticleNotFoundException(articleId));
+        given(articleQueryApi.exists(articleId)).willReturn(false);
 
         assertThatThrownBy(() -> commentService.register(articleId, userId, "댓글"))
                 .isInstanceOf(CommentArticleNotFoundException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
         then(articleCommandApi).shouldHaveNoInteractions();
-        then(articleQueryApi).should(never()).exists(articleId);
+        then(articleQueryApi).should(never()).getTitle(articleId);
     }
 
     @Test
