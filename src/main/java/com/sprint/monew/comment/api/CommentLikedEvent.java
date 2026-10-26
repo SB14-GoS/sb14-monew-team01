@@ -7,6 +7,7 @@ public record CommentLikedEvent(
         UUID commentLikeId,
         Instant likedAt,
         UUID likerId,
+        String likerNickname,
         UUID commentId,
         UUID articleId,
         String articleTitle,

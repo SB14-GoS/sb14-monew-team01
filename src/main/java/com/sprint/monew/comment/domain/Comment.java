@@ -1,5 +1,8 @@
 package com.sprint.monew.comment.domain;
 
+import com.sprint.monew.comment.domain.exception.ArticleIdRequiredException;
+import com.sprint.monew.comment.domain.exception.CommentUserIdRequiredException;
+import com.sprint.monew.comment.domain.exception.InvalidCommentContentException;
 import com.sprint.monew.global.common.BaseSoftDeleteEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -10,12 +13,13 @@ import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "comment")
-@NoArgsConstructor
+@Table(name = "comments")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 public class Comment extends BaseSoftDeleteEntity {
 
@@ -25,7 +29,7 @@ public class Comment extends BaseSoftDeleteEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 500)
     private String content;
 
     @Column(nullable = false)
@@ -38,6 +42,15 @@ public class Comment extends BaseSoftDeleteEntity {
     private List<CommentLike> commentLike = new ArrayList<>();
 
     public Comment(UUID articleId, UUID userId, String content) {
+        if (articleId == null) {
+            throw new ArticleIdRequiredException();
+        }
+        if (userId == null) {
+            throw new CommentUserIdRequiredException();
+        }
+        if (content == null || content.isBlank() || content.length() > 500) {
+            throw new InvalidCommentContentException(content);
+        }
         this.articleId = articleId;
         this.userId = userId;
         this.content = content;
