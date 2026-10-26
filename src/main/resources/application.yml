@@ -3,6 +3,9 @@ spring:
     name: monew
   profiles:
     default: local
+  mongodb:
+    representation:
+      uuid: standard   # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
   jpa:
     open-in-view: false
     properties:
