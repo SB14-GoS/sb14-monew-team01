@@ -7,15 +7,18 @@ import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
 import com.sprint.monew.user.domain.UserNotFoundException;
 import com.sprint.monew.user.domain.UserRepository;
+import com.sprint.monew.user.domain.*;
 import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
+import com.sprint.monew.user.web.dto.UserUpdateRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -61,6 +64,19 @@ public class UserService implements UserQueryApi {
         return found.filter(user -> passwordMatches && !user.isDeleted())
                 .map(UserDto::from)
                 .orElseThrow(LoginFailedException::new);
+    }
+
+    @Transactional
+    public UserDto updateNickname(UUID userId, UUID requesterId, UserUpdateRequest request) {
+        if (!userId.equals(requesterId)) {
+            throw new UserUpdateForbiddenException(userId);
+        }
+        User user = userRepository
+                .findById(userId)
+                .filter(found -> !found.isDeleted())
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        user.updateNickname(request.nickname());
+        return UserDto.from(user);
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {

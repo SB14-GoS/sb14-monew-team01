@@ -1,7 +1,9 @@
 package com.sprint.monew.user.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sprint.monew.user.application.UserService;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
+import com.sprint.monew.user.domain.UserUpdateForbiddenException;
 import com.sprint.monew.user.web.dto.UserDto;
 import java.time.Instant;
 import java.util.UUID;
@@ -98,5 +101,54 @@ public class UserControllerTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+    }
+
+    @Test
+    @DisplayName("닉네임 수정에 성공하면 200과 수정된 사용자 정보를 반환한다")
+    void updateNickname() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserDto userDto = new UserDto(userId, "woody@monew.com", "보안관우디", Instant.now());
+        given(userService.updateNickname(eq(userId), eq(userId), any())).willReturn(userDto);
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .header("Monew-Request-User-ID", userId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "보안관우디"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("보안관우디"));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 정보를 수정하면 403을 반환한다")
+    void updateNicknameForbidden() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        given(userService.updateNickname(eq(userId), eq(otherUserId), any()))
+                .willThrow(new UserUpdateForbiddenException(userId));
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .header("Monew-Request-User-ID", otherUserId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "버즈"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_UPDATE_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("닉네임이 비어 있으면 400을 반환한다")
+    void updateNicknameWithBlank() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .header("Monew-Request-User-ID", userId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": ""}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }
