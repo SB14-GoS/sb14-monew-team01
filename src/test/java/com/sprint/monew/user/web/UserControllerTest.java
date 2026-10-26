@@ -151,4 +151,36 @@ public class UserControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("닉네임이 20자면 수정에 성공한다")
+    void updateNicknameWithMaxLength() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String nickname = "가".repeat(20);
+        UserDto userDto = new UserDto(userId, "woody@monew.com", nickname, Instant.now());
+        given(userService.updateNickname(eq(userId), eq(userId), any())).willReturn(userDto);
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .header("Monew-Request-User-ID", userId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "%s"}
+                                """.formatted(nickname)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("닉네임이 21자면 400을 반환한다")
+    void updateNicknameWithTooLongNickname() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String nickname = "가".repeat(21);
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .header("Monew-Request-User-ID", userId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "%s"}
+                                """.formatted(nickname)))
+                .andExpect(status().isBadRequest());
+    }
 }
