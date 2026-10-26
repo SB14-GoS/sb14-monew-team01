@@ -3,6 +3,8 @@ package com.sprint.monew.user.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +19,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -138,18 +142,18 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.code").value("USER_UPDATE_FORBIDDEN"));
     }
 
-    @Test
-    @DisplayName("닉네임이 비어 있으면 400을 반환한다")
-    void updateNicknameWithBlank() throws Exception {
+    @ParameterizedTest(name = "{0} → 400")
+    @ValueSource(strings = {"{\"nickname\": \"\"}", "{\"nickname\": \"   \"}", "{\"nickname\": null}", "{}"})
+    @DisplayName("닉네임이 비었거나 공백·null·누락이면 400을 반환한다")
+    void updateNicknameWithInvalidNickname(String body) throws Exception {
         UUID userId = UUID.randomUUID();
 
         mockMvc.perform(patch("/api/users/{userId}", userId)
                         .header("Monew-Request-User-ID", userId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nickname": ""}
-                                """))
+                        .content(body))
                 .andExpect(status().isBadRequest());
+        verify(userService, never()).updateNickname(any(), any(), any());
     }
 
     @Test
