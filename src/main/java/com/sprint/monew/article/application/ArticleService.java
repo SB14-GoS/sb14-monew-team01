@@ -8,6 +8,7 @@ import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.ArticleView;
 import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.exception.UserIdRequiredException;
+import com.sprint.monew.article.domain.repository.ArticleInterestRepository;
 import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
 import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
@@ -37,6 +38,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     private final ArticleQueryRepository articleQueryRepository;
     private final ArticleViewRepository articleViewRepository;
     private final ArticleRepository articleRepository;
+    private final ArticleInterestRepository articleInterestRepository;
 
     @Transactional(readOnly = true)
     public ArticleDto read(UUID articleId, UUID userId) {
@@ -105,6 +107,16 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         Article target =
                 articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
         target.softDelete(); /* Dirty checking */
+    }
+
+    @Transactional
+    public void deleteHard(UUID articleId) {
+        Article target =
+                articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
+        articleViewRepository.deleteArticleViewsByArticleId(target.getId());
+        articleInterestRepository.deleteArticleInterestsByArticleId(target.getId());
+        articleRepository.delete(target);
+        /* 얘네까지가 기사 도메인에서 삭제 가능한얘들 */
     }
 
     /* 출처 목록 반환 */
