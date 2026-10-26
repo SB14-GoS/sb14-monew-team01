@@ -7,7 +7,7 @@ import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
-import lombok.RequiredArgsConstructor;
+import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,11 +15,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
+    private static final String DUMMY_PASSWORD = "monew-timing-safe-dummy";
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String dummyEncodedPassword;
+
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.dummyEncodedPassword = passwordEncoder.encode(DUMMY_PASSWORD);
+    }
 
     @Transactional
     public UserDto register(UserRegisterRequest request) {
@@ -39,12 +46,13 @@ public class UserService {
     }
 
     public UserDto login(UserLoginRequest request) {
-        User user = userRepository
-                .findByEmail(request.email())
-                .filter(found -> !found.isDeleted())
-                .filter(found -> passwordEncoder.matches(request.password(), found.getPassword()))
+        Optional<User> found = userRepository.findByEmail(request.email());
+        String encodedPassword = found.map(User::getPassword).orElse(dummyEncodedPassword);
+        boolean passwordMatches = passwordEncoder.matches(request.password(), encodedPassword);
+
+        return found.filter(user -> passwordMatches && !user.isDeleted())
+                .map(UserDto::from)
                 .orElseThrow(LoginFailedException::new);
-        return UserDto.from(user);
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
