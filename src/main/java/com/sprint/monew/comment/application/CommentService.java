@@ -110,9 +110,10 @@ public class CommentService {
 
     @Transactional
     public CommentDto update(UUID commentId, UUID userId, String content) {
-        Comment comment =
-                commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
-
+        Comment comment = commentRepository
+                .findById(commentId)
+                .filter(found -> !found.isDeleted())
+                .orElseThrow(() -> new CommentNotFoundException(commentId));
         comment.updateContent(userId, content);
         UserSummary user = userQueryApi.getSummary(userId);
         boolean likeByMe = commentLikeRepository.existsByComment_IdAndUserId(commentId, userId);
