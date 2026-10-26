@@ -7,6 +7,7 @@ import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.web.dto.CommentDto;
@@ -16,7 +17,10 @@ import com.sprint.monew.global.common.SortDirection;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -79,24 +83,37 @@ public class CommentService {
         }
         CommentOrderBy commentOrderBy = CommentOrderBy.from(orderBy);
 
-        List<CommentDto> comments =
-                commentRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request).stream()
-                        .map(result -> CommentDto.from(
-                                result.comment(),
-                                userQueryApi
-                                        .getSummary(result.comment().getUserId())
-                                        .nickname(), // n+1 문제가 생성됨.
-                                result.likedByMe() // 임시 false
-                                ))
-                        .toList();
-
+        List<CommentSearchResult> comments =
+                commentRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request);
         long totalCommentCount = commentRepository.countByArticleId(articleId);
 
-        return CursorPageResponse.of(
+        CursorPageResponse<CommentSearchResult> page = CursorPageResponse.of(
                 comments,
                 request.limit(),
                 totalCommentCount,
-                comment -> comment.id().toString(),
-                CommentDto::createdAt);
+                result -> result.comment().getId().toString(),
+                result -> result.comment().getCreatedAt());
+
+        Set<UUID> authorIds = page.content().stream()
+                .map(result -> result.comment().getUserId())
+                .collect(Collectors.toSet());
+
+        Map<UUID, UserSummary> usersById = userQueryApi.getSummaries(authorIds);
+
+        List<CommentDto> dtoContent = page.content().stream()
+                .map(result -> {
+                    Comment comment = result.comment();
+
+                    UserSummary user = usersById.get(comment.getUserId());
+                    if (user == null) {
+                        throw new CommentUserNotFoundException(comment.getUserId());
+                    }
+
+                    return CommentDto.from(comment, user.nickname(), result.likedByMe());
+                })
+                .toList();
+
+        return new CursorPageResponse<>(
+                dtoContent, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
     }
 }
