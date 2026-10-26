@@ -3,6 +3,7 @@ package com.sprint.monew.user.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -136,5 +137,27 @@ public class UserServiceTest {
 
         assertThatThrownBy(() -> userService.login(new UserLoginRequest("woody@monew.com", "monew1!")))
                 .isInstanceOf(LoginFailedException.class);
+    }
+
+    @Test
+    @DisplayName("가입되지 않은 이메일이어도 비밀번호 검증을 수행한다 (응답 시간 차이 방지)")
+    void loginWithUnknownEmailStillChecksPassword() {
+        given(userRepository.findByEmail("none@monew.com")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.login(new UserLoginRequest("none@monew.com", "monew1!")))
+                .isInstanceOf(LoginFailedException.class);
+        verify(passwordEncoder).matches(eq("monew1!"), any());
+    }
+
+    @Test
+    @DisplayName("탈퇴한 사용자여도 비밀번호 검증을 수행한다 (응답 시간 차이 방지)")
+    void loginWithDeletedUserStillChecksPassword() {
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        user.softDelete();
+        given(userRepository.findByEmail("woody@monew.com")).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.login(new UserLoginRequest("woody@monew.com", "monew1!")))
+                .isInstanceOf(LoginFailedException.class);
+        verify(passwordEncoder).matches("monew1!", "encoded-password");
     }
 }
