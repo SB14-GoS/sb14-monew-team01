@@ -16,7 +16,9 @@ import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
+import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
+import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
@@ -28,6 +30,7 @@ import com.sprint.monew.user.api.UserSummary;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -242,6 +245,52 @@ class CommentServiceTest {
                 .isInstanceOf(InvalidCommentOrderByException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 작성자가_댓글을_수정하면_수정된_댓글을_반환한다() {
+        UUID commentId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-26T01:00:00Z");
+        Comment comment = mockComment(articleId, userId, createdAt, 3L);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "작성자"));
+        given(commentRepository.existsByCommentIdAndUserId(commentId, userId)).willReturn(true);
+
+        CommentDto response = commentService.update(commentId, userId, "수정한 댓글");
+
+        verify(comment).updateContent(userId, "수정한 댓글");
+        assertThat(response)
+                .extracting(CommentDto::userNickname, CommentDto::likeCount, CommentDto::likedByMe)
+                .containsExactly("작성자", 3L, true);
+    }
+
+    @Test
+    void 존재하지_않는_댓글은_수정할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        given(commentRepository.findById(commentId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commentService.update(commentId, UUID.randomUUID(), "수정한 댓글"))
+                .isInstanceOf(CommentNotFoundException.class);
+
+        then(userQueryApi).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 작성자가_아니면_댓글을_수정할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        org.mockito.Mockito.doThrow(new CommentAccessDeniedException(commentId, requesterId))
+                .when(comment)
+                .updateContent(requesterId, "수정한 댓글");
+
+        assertThatThrownBy(() -> commentService.update(commentId, requesterId, "수정한 댓글"))
+                .isInstanceOf(CommentAccessDeniedException.class);
+
+        then(userQueryApi).shouldHaveNoInteractions();
     }
 
     private Comment mockComment(UUID articleId, UUID userId, Instant createdAt, long likeCount) {

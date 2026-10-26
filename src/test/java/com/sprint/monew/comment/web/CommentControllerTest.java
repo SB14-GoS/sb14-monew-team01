@@ -5,11 +5,14 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sprint.monew.comment.application.CommentService;
+import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
+import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
@@ -243,6 +246,84 @@ class CommentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(commentService).search(articleId, requesterId, "invalid", SortDirection.ASC, request);
+    }
+
+    @Test
+    @DisplayName("작성자는 JSON 본문으로 댓글을 수정할 수 있다")
+    void update() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        CommentDto response = new CommentDto(
+                commentId, UUID.randomUUID(), userId, "작성자", "수정한 댓글", 3L, true, Instant.parse("2026-10-26T01:00:00Z"));
+        given(commentService.update(commentId, userId, "수정한 댓글")).willReturn(response);
+
+        mockMvc.perform(patch("/api/comments/{commentId}", commentId)
+                        .header("Monew-Request-User-ID", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"수정한 댓글\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("수정한 댓글"))
+                .andExpect(jsonPath("$.likeCount").value(3))
+                .andExpect(jsonPath("$.likedByMe").value(true));
+
+        verify(commentService).update(commentId, userId, "수정한 댓글");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   ", "a"})
+    @DisplayName("유효하지 않은 수정 내용은 서비스 호출 전에 400을 반환한다")
+    void rejectsInvalidUpdateContent(String content) throws Exception {
+        String invalidContent = content.equals("a") ? "a".repeat(501) : content;
+
+        mockMvc.perform(patch("/api/comments/{commentId}", UUID.randomUUID())
+                        .header("Monew-Request-User-ID", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"%s\"}".formatted(invalidContent)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.content").exists());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("수정 요청에 사용자 ID 헤더가 없으면 400을 반환한다")
+    void rejectsMissingUpdateRequesterId() throws Exception {
+        mockMvc.perform(patch("/api/comments/{commentId}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"수정한 댓글\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 댓글 수정은 404를 반환한다")
+    void updateNotFound() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        willThrow(new CommentNotFoundException(commentId)).given(commentService).update(commentId, userId, "수정한 댓글");
+
+        mockMvc.perform(patch("/api/comments/{commentId}", commentId)
+                        .header("Monew-Request-User-ID", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"수정한 댓글\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("타인의 댓글 수정은 403을 반환한다")
+    void updateAccessDenied() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        willThrow(new CommentAccessDeniedException(commentId, userId))
+                .given(commentService)
+                .update(commentId, userId, "수정한 댓글");
+
+        mockMvc.perform(patch("/api/comments/{commentId}", commentId)
+                        .header("Monew-Request-User-ID", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"수정한 댓글\"}"))
+                .andExpect(status().isForbidden());
     }
 
     private static Stream<String> missingArticleIdRequests() {
