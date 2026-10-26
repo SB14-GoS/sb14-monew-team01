@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 public interface CommentApiDocs {
 
     @Operation(summary = "댓글 등록")
-    ResponseEntity<CommentDto> register(UUID userId, CommentRegisterRequest request);
+    ResponseEntity<CommentDto> register(CommentRegisterRequest request);
 
     @Operation(summary = "댓글 전체 읽기")
     ResponseEntity<CursorPageResponse<CommentDto>> readAll(

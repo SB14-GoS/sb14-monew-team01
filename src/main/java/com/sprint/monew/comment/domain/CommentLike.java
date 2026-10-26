@@ -9,14 +9,15 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-        name = "comment_like",
+        name = "comment_likes",
         uniqueConstraints = {
             @UniqueConstraint(
                     name = "uk_comment_like_comment_user",

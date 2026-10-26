@@ -1,8 +1,10 @@
 package com.sprint.monew.comment.web;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,10 +16,14 @@ import com.sprint.monew.global.common.SortDirection;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,6 +35,73 @@ class CommentControllerTest {
 
     @MockitoBean
     private CommentService commentService;
+
+    @Test
+    void 정상_댓글_등록은_201과_댓글_응답을_반환한다() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-26T01:00:00Z");
+
+        CommentDto response =
+                new CommentDto(UUID.randomUUID(), articleId, userId, "작성자", "댓글입니다.", 0L, false, createdAt);
+
+        given(commentService.register(articleId, userId, "댓글입니다.")).willReturn(response);
+
+        mockMvc.perform(post("/api/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"articleId":"%s","userId":"%s","content":"댓글입니다."}
+                            """.formatted(articleId, userId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(response.id().toString()))
+                .andExpect(jsonPath("$.articleId").value(articleId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.content").value("댓글입니다."))
+                .andExpect(jsonPath("$.likedByMe").value(false));
+
+        verify(commentService).register(articleId, userId, "댓글입니다.");
+    }
+
+    @ParameterizedTest
+    @MethodSource("missingArticleIdRequests")
+    @DisplayName("articleId가 없거나 null이면 서비스 호출 전에 400을 반환한다")
+    void rejectsMissingArticleId(String requestBody) throws Exception {
+        mockMvc.perform(post("/api/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.articleId").exists());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("missingUserIdRequests")
+    @DisplayName("userId가 없거나 null이면 서비스 호출 전에 400을 반환한다")
+    void rejectsMissingUserId(String requestBody) throws Exception {
+        mockMvc.perform(post("/api/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.userId").exists());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidContentRequests")
+    @DisplayName("content가 비었거나 500자를 초과하면 서비스 호출 전에 400을 반환한다")
+    void rejectsInvalidContent(String content) throws Exception {
+        mockMvc.perform(post("/api/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"articleId":"%s","userId":"%s","content":"%s"}
+                                """.formatted(UUID.randomUUID(), UUID.randomUUID(), content)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.content").exists());
+
+        verifyNoInteractions(commentService);
+    }
 
     @Test
     @DisplayName("댓글 목록 조회 요청을 서비스에 전달하고 커서 응답을 반환한다")
@@ -43,8 +116,7 @@ class CommentControllerTest {
         CursorPageResponse<CommentDto> response =
                 new CursorPageResponse<>(List.of(comment), commentId.toString(), createdAt, 1, 7L, true);
 
-        org.mockito.BDDMockito.given(
-                        commentService.search(articleId, requesterId, "likeCount", SortDirection.DESC, request))
+        given(commentService.search(articleId, requesterId, "likeCount", SortDirection.DESC, request))
                 .willReturn(response);
 
         mockMvc.perform(get("/api/comments")
@@ -93,5 +165,27 @@ class CommentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(commentService);
+    }
+
+    private static Stream<String> missingArticleIdRequests() {
+        UUID userId = UUID.randomUUID();
+        return Stream.of("""
+                {"userId":"%s","content":"댓글입니다."}
+                """.formatted(userId), """
+                {"articleId":null,"userId":"%s","content":"댓글입니다."}
+                """.formatted(userId));
+    }
+
+    private static Stream<String> missingUserIdRequests() {
+        UUID articleId = UUID.randomUUID();
+        return Stream.of("""
+                {"articleId":"%s","content":"댓글입니다."}
+                """.formatted(articleId), """
+                {"articleId":"%s","userId":null,"content":"댓글입니다."}
+                """.formatted(articleId));
+    }
+
+    private static Stream<String> invalidContentRequests() {
+        return Stream.of("", "   ", "a".repeat(501));
     }
 }

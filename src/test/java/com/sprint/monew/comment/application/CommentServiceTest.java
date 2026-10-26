@@ -6,10 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
+import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
@@ -59,7 +61,6 @@ class CommentServiceTest {
     void 존재하는_기사에_댓글을_등록하면_기사_댓글_수를_증가시킨다() {
         UUID articleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        given(articleQueryApi.exists(articleId)).willReturn(true);
         given(userQueryApi.exists(userId)).willReturn(true);
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "댓글작성자"));
         given(articleQueryApi.getTitle(articleId)).willReturn("기사 제목");
@@ -68,6 +69,8 @@ class CommentServiceTest {
         var comment = commentService.register(articleId, userId, "좋은 기사네요.");
 
         then(commentRepository).should().save(any());
+        then(articleQueryApi).should().getTitle(articleId);
+        then(articleQueryApi).should(never()).exists(articleId);
         then(articleCommandApi).should().increaseCommentCount(articleId);
         ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -87,20 +90,22 @@ class CommentServiceTest {
     @Test
     void 존재하지_않는_기사에는_댓글을_등록할_수_없다() {
         UUID articleId = UUID.randomUUID();
-        given(articleQueryApi.exists(articleId)).willReturn(false);
+        UUID userId = UUID.randomUUID();
+        given(userQueryApi.exists(userId)).willReturn(true);
+        given(articleQueryApi.getTitle(articleId)).willThrow(new ArticleNotFoundException(articleId));
 
-        assertThatThrownBy(() -> commentService.register(articleId, UUID.randomUUID(), "댓글"))
+        assertThatThrownBy(() -> commentService.register(articleId, userId, "댓글"))
                 .isInstanceOf(CommentArticleNotFoundException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
         then(articleCommandApi).shouldHaveNoInteractions();
+        then(articleQueryApi).should(never()).exists(articleId);
     }
 
     @Test
     void 존재하지_않는_사용자는_댓글을_등록할_수_없다() {
         UUID articleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        given(articleQueryApi.exists(articleId)).willReturn(true);
         given(userQueryApi.exists(userId)).willReturn(false);
 
         assertThatThrownBy(() -> commentService.register(articleId, userId, "댓글"))
@@ -108,6 +113,7 @@ class CommentServiceTest {
 
         then(commentRepository).shouldHaveNoInteractions();
         then(articleCommandApi).shouldHaveNoInteractions();
+        then(articleQueryApi).shouldHaveNoInteractions();
     }
 
     @Test

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record CommentRegisterRequest(
         @NotNull UUID articleId,
-        UUID userId,
+        @NotNull UUID userId,
 
         @NotBlank(message = "댓글 내용은 비어 있을 수 없습니다.") @Size(max = 500, message = "댓글은 500자 이하여야 합니다.")
         String content) {}

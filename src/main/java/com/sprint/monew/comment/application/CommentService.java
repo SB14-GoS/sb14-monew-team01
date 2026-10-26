@@ -2,6 +2,7 @@ package com.sprint.monew.comment.application;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
+import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
@@ -33,16 +34,15 @@ public class CommentService {
 
     @Transactional
     public CommentDto register(UUID articleId, UUID userId, String content) {
-        if (!articleQueryApi.exists(articleId)) {
-            throw new CommentArticleNotFoundException(articleId);
-        }
 
+        // getSummary()는 탈퇴 사용자도 반환할 수 있으므로, 댓글 등록 전 활동 가능한 사용자 여부를 확인한다.
         if (!userQueryApi.exists(userId)) {
             throw new CommentUserNotFoundException(userId);
         }
 
         UserSummary user = userQueryApi.getSummary(userId);
-        String articleTitle = articleQueryApi.getTitle(articleId);
+
+        String articleTitle = getArticleTitle(articleId);
 
         Comment comment = commentRepository.save(new Comment(articleId, userId, content));
         articleCommandApi.increaseCommentCount(articleId);
@@ -61,6 +61,14 @@ public class CommentService {
                 comment.getContent(),
                 comment.getLikeCount(),
                 comment.getCreatedAt());
+    }
+
+    private String getArticleTitle(UUID articleId) {
+        try {
+            return articleQueryApi.getTitle(articleId);
+        } catch (ArticleNotFoundException exception) {
+            throw new CommentArticleNotFoundException(articleId);
+        }
     }
 
     @Transactional(readOnly = true)

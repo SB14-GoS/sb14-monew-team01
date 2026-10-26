@@ -10,6 +10,7 @@ import com.sprint.monew.global.web.RequestUserId;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -25,10 +26,9 @@ public class CommentController implements CommentApiDocs {
 
     @PostMapping("api/comments")
     @Override
-    public ResponseEntity<CommentDto> register(
-            @RequestUserId UUID userId, @Valid @RequestBody CommentRegisterRequest request) {
-        CommentDto commentDto = commentService.register(request.articleId(), userId, request.content());
-        return ResponseEntity.ok(commentDto);
+    public ResponseEntity<CommentDto> register(@Valid @RequestBody CommentRegisterRequest request) {
+        CommentDto commentDto = commentService.register(request.articleId(), request.userId(), request.content());
+        return ResponseEntity.status(HttpStatus.CREATED).body(commentDto);
     }
 
     @GetMapping("api/comments")
