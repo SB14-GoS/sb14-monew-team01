@@ -18,10 +18,7 @@ public class NotificationEventHandler {
         }
 
         notificationService.createCommentLikeNotification(
-                event.commentUserId(),
-                event.commentId(),
-                event.likerId().toString() // todo: likerNickname 추가 후 event.likerNickname()로 변경 예정
-                );
+                event.commentUserId(), event.commentId(), event.likerNickname());
     }
 
     @EventListener
