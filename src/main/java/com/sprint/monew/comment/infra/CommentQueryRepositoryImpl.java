@@ -4,7 +4,6 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentQueryRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
@@ -27,6 +26,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
 
     // 특정 기사에 달린 댓글을 정렬하여, 일정 개수씩 조회하는 기능, 한번에 limit 개씩 조회
     @Override
+    // 기사별 댓글과 요청자 기준 좋아요 여부를 커서 조건에 맞춰 조회한다.
     public List<CommentSearchResult> findByArticleId(
             UUID articleId, UUID requesterId, CommentOrderBy orderBy, SortDirection direction, CursorRequest request) {
 
@@ -54,6 +54,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     }
 
     @Override
+    // 소프트 삭제되지 않은 기사 댓글의 전체 개수를 조회한다.
     public long countByArticleId(UUID articleId) {
         QComment comment = QComment.comment;
 
@@ -65,7 +66,10 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
         return count == null ? 0L : count;
     }
 
-    // 첫 페이지면 조건 없음. 다음 페이지면 "마지막으로 본 댓글 다음"부터
+    // ========================================================================================
+    // 내부 헬퍼 메서드
+
+    // 첫 페이지는 비워 두고 다음 페이지는 정렬 기준에 맞는 cursor 조건을 반환한다.
     private BooleanExpression cursorCondition(
             QComment comment, UUID articleId, CursorRequest request, CommentOrderBy orderBy, SortDirection direction) {
 
@@ -81,12 +85,12 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
 
         return switch (orderBy) {
             case CREATED_AT -> createdAtCursorCondition(comment, request, direction);
-            case LIKE_COUNT -> likeCountCursorCondition(comment, articleId, request, direction);
+            case LIKE_COUNT -> likeCountCursorCondition(comment, request, direction);
         };
     }
 
-    private OrderSpecifier<?>[] orderSpecifiers( // 생성순, 좋아요 순서로 댓글 정렬
-            QComment comment, CommentOrderBy orderBy, SortDirection direction) {
+    // 정렬 기준과 방향에 따른 기본 정렬 및 ID 보조 정렬을 반환한다.
+    private OrderSpecifier<?>[] orderSpecifiers(QComment comment, CommentOrderBy orderBy, SortDirection direction) {
 
         boolean asc = direction == SortDirection.ASC;
 
@@ -103,37 +107,28 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
         };
     }
 
+    // 좋아요 수와 댓글 ID를 기준으로 다음 페이지 조건을 생성한다.
     private BooleanExpression likeCountCursorCondition(
-            QComment comment, UUID articleId, CursorRequest request, SortDirection direction) {
+            QComment comment, CursorRequest request, SortDirection direction) {
 
         if (request.cursor() == null || request.after() == null) {
             return null;
         }
 
-        UUID cursorId = parseCursorId(request.cursor());
-
-        Comment cursorComment = queryFactory
-                .selectFrom(comment)
-                .where(comment.id.eq(cursorId), comment.articleId.eq(articleId), comment.deletedAt.isNull())
-                .fetchOne();
-
-        // 실제 구현에서는 없을 때 예외 처리
-        if (cursorComment == null) {
-            throw new InvalidCommentCursorException(request.cursor());
-        }
-
-        long cursorLikeCount = cursorComment.getLikeCount();
         boolean asc = direction == SortDirection.ASC;
+
+        LikeCountCursor cursor = parseLikeCountCursor(request.cursor());
 
         return asc
                 ? comment.likeCount
-                        .gt(cursorLikeCount)
-                        .or(comment.likeCount.eq(cursorLikeCount).and(comment.id.gt(cursorId)))
+                        .gt(cursor.likeCount())
+                        .or(comment.likeCount.eq(cursor.likeCount()).and(comment.id.gt(cursor.commentId())))
                 : comment.likeCount
-                        .lt(cursorLikeCount)
-                        .or(comment.likeCount.eq(cursorLikeCount).and(comment.id.lt(cursorId)));
+                        .lt(cursor.likeCount())
+                        .or(comment.likeCount.eq(cursor.likeCount()).and(comment.id.lt(cursor.commentId())));
     }
 
+    // 생성 시각과 댓글 ID를 기준으로 다음 페이지 조건을 생성한다.
     private BooleanExpression createdAtCursorCondition(
             QComment comment, CursorRequest request, SortDirection direction) {
 
@@ -150,6 +145,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
                 : comment.createdAt.lt(after).or(comment.createdAt.eq(after).and(comment.id.lt(cursorId)));
     }
 
+    // 생성 시각 정렬 cursor의 댓글 ID를 UUID로 변환한다.
     private UUID parseCursorId(String cursor) {
         try {
             return UUID.fromString(cursor);
@@ -157,4 +153,22 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
             throw new InvalidCommentCursorException(cursor);
         }
     }
+
+    // 좋아요 수 정렬 cursor의 "likeCount_commentId" 값을 분리한다.
+    private LikeCountCursor parseLikeCountCursor(String cursor) {
+        try {
+            String[] values = cursor.split("_", 2);
+
+            if (values.length != 2) {
+                throw new IllegalArgumentException();
+            }
+
+            return new LikeCountCursor(Long.parseLong(values[0]), UUID.fromString(values[1]));
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidCommentCursorException(cursor);
+        }
+    }
+
+    // 좋아요 수 정렬의 커서 기준값을 보관한다.
+    private record LikeCountCursor(long likeCount, UUID commentId) {}
 }

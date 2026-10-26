@@ -36,6 +36,7 @@ public class CommentService {
     private final UserQueryApi userQueryApi;
     private final ApplicationEventPublisher eventPublisher;
 
+    // 댓글을 등록하고 기사 댓글 수 증가 및 생성 이벤트 발행을 처리한다.
     @Transactional
     public CommentDto register(UUID articleId, UUID userId, String content) {
 
@@ -55,26 +56,7 @@ public class CommentService {
         return CommentDto.from(comment, user.nickname(), false);
     }
 
-    private CommentCreatedEvent toCreatedEvent(Comment comment, String articleTitle, String userNickname) {
-        return new CommentCreatedEvent(
-                comment.getId(),
-                comment.getArticleId(),
-                articleTitle,
-                comment.getUserId(),
-                userNickname,
-                comment.getContent(),
-                comment.getLikeCount(),
-                comment.getCreatedAt());
-    }
-
-    private String getArticleTitle(UUID articleId) {
-        try {
-            return articleQueryApi.getTitle(articleId);
-        } catch (ArticleNotFoundException exception) {
-            throw new CommentArticleNotFoundException(articleId);
-        }
-    }
-
+    // 기사별 댓글을 정렬·커서 페이지 방식으로 조회한다.
     @Transactional(readOnly = true)
     public CursorPageResponse<CommentDto> search(
             UUID articleId, UUID requesterId, String orderBy, SortDirection direction, CursorRequest request) {
@@ -91,7 +73,7 @@ public class CommentService {
                 comments,
                 request.limit(),
                 totalCommentCount,
-                result -> result.comment().getId().toString(),
+                result -> cursorOf(result, commentOrderBy),
                 result -> result.comment().getCreatedAt());
 
         Set<UUID> authorIds = page.content().stream()
@@ -115,5 +97,40 @@ public class CommentService {
 
         return new CursorPageResponse<>(
                 dtoContent, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
+    }
+
+    // ========================================================================================
+    // 내부 헬퍼 메서드
+
+    // 저장된 댓글을 다른 모듈에 전달할 생성 이벤트로 변환한다.
+    private CommentCreatedEvent toCreatedEvent(Comment comment, String articleTitle, String userNickname) {
+        return new CommentCreatedEvent(
+                comment.getId(),
+                comment.getArticleId(),
+                articleTitle,
+                comment.getUserId(),
+                userNickname,
+                comment.getContent(),
+                comment.getLikeCount(),
+                comment.getCreatedAt());
+    }
+
+    // 기사 제목을 조회하고 없는 기사는 댓글 도메인 예외로 변환한다.
+    private String getArticleTitle(UUID articleId) {
+        try {
+            return articleQueryApi.getTitle(articleId);
+        } catch (ArticleNotFoundException exception) {
+            throw new CommentArticleNotFoundException(articleId);
+        }
+    }
+
+    // 정렬 기준에 맞는 다음 페이지용 cursor 문자열을 생성한다.
+    private String cursorOf(CommentSearchResult result, CommentOrderBy orderBy) {
+        Comment comment = result.comment();
+
+        return switch (orderBy) {
+            case CREATED_AT -> comment.getId().toString();
+            case LIKE_COUNT -> comment.getLikeCount() + "_" + comment.getId();
+        };
     }
 }
