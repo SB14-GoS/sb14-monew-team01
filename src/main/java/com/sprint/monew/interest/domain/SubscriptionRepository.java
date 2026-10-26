@@ -1,7 +1,6 @@
 package com.sprint.monew.interest.domain;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,8 +13,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     // 이미 구독 중인지 확인하여 중복 구독을 방지하기 위한 메서드
     boolean existsByUserIdAndInterestId(UUID userId, UUID interestId);
 
-    // 삭제할 구독 엔티티 조회하기 위한 메서드
-    Optional<Subscription> findByUserIdAndInterestId(UUID userId, UUID interestId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Subscription s WHERE s.userId = :userId AND s.interest.id = :interestId")
+    int deleteByUserIdAndInterestId(@Param("userId") UUID userId, @Param("interestId") UUID interestId);
 
     // 관심사 삭제 전 연관된 구독 데이터 일괄 삭제
     @Modifying(clearAutomatically = true, flushAutomatically = true)

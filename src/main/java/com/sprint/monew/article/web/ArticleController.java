@@ -12,6 +12,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,5 +43,19 @@ public class ArticleController implements ArticleApiDocs {
     @GetMapping("/api/articles/sources")
     public ResponseEntity<List<ArticleSource>> getSourceList() {
         return ResponseEntity.status(HttpStatus.OK).body(articleService.getSourceList());
+    }
+
+    @Override
+    @DeleteMapping("/api/articles/{articleId}")
+    public ResponseEntity<Void> delete(@PathVariable UUID articleId) {
+        articleService.delete(articleId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @Override
+    @DeleteMapping("/api/articles/{articleId}/hard")
+    public ResponseEntity<Void> deleteHard(@PathVariable UUID articleId) {
+        articleService.deleteHard(articleId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

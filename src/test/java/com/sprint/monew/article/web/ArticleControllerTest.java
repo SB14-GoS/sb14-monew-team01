@@ -3,15 +3,19 @@ package com.sprint.monew.article.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sprint.monew.article.application.ArticleService;
 import com.sprint.monew.article.domain.ArticleOrderBy;
 import com.sprint.monew.article.domain.ArticleSource;
+import com.sprint.monew.article.domain.exception.ArticleNotFoundException;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.article.web.dto.ArticleDto;
 import com.sprint.monew.global.common.CursorPageResponse;
@@ -42,6 +46,53 @@ class ArticleControllerTest {
     ArticleService articleService;
 
     private final UUID userId = UUID.randomUUID();
+
+    @Test
+    @DisplayName("수집 출처 목록은 200과 출처 배열을 반환한다")
+    void returnsSources() throws Exception {
+        given(articleService.getSourceList()).willReturn(List.of(ArticleSource.NAVER, ArticleSource.HANKYUNG));
+
+        mockMvc.perform(get("/api/articles/sources"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[\"NAVER\",\"HANKYUNG\"]"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("논리·물리 삭제 성공 시 본문 없이 204를 반환한다")
+    void deletesArticle(boolean hard) throws Exception {
+        UUID articleId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/articles/" + articleId + (hard ? "/hard" : "")))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        if (hard) {
+            verify(articleService).deleteHard(articleId);
+        } else {
+            verify(articleService).delete(articleId);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("삭제 대상 기사가 없으면 ARTICLE_NOT_FOUND와 404를 반환한다")
+    void rejectsDeletingMissingArticle(boolean hard) throws Exception {
+        UUID articleId = UUID.randomUUID();
+        if (hard) {
+            willThrow(new ArticleNotFoundException(articleId))
+                    .given(articleService)
+                    .deleteHard(articleId);
+        } else {
+            willThrow(new ArticleNotFoundException(articleId))
+                    .given(articleService)
+                    .delete(articleId);
+        }
+
+        mockMvc.perform(delete("/api/articles/" + articleId + (hard ? "/hard" : "")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ARTICLE_NOT_FOUND"));
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})

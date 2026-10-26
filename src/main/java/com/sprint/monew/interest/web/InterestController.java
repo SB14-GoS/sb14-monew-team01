@@ -3,10 +3,12 @@ package com.sprint.monew.interest.web;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.web.RequestUserId;
 import com.sprint.monew.interest.application.InterestService;
+import com.sprint.monew.interest.application.SubscriptionService;
 import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
 import com.sprint.monew.interest.web.dto.InterestSearchRequest;
 import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
+import com.sprint.monew.interest.web.dto.SubscriptionDto;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class InterestController implements InterestApiDocs {
 
     private final InterestService interestService;
+    private final SubscriptionService subscriptionService;
 
     @Override
     @PostMapping
@@ -55,5 +58,19 @@ public class InterestController implements InterestApiDocs {
     public ResponseEntity<CursorPageResponse<InterestDto>> getInterest(
             @Valid @ModelAttribute InterestSearchRequest request, @RequestUserId UUID userId) {
         return ResponseEntity.ok(interestService.getInterests(request, userId));
+    }
+
+    @Override
+    @PostMapping("/{interestId}/subscriptions")
+    public ResponseEntity<SubscriptionDto> subscribeInterest(
+            @PathVariable UUID interestId, @RequestUserId UUID userId) {
+        return ResponseEntity.ok(subscriptionService.subscribeInterest(interestId, userId));
+    }
+
+    @Override
+    @DeleteMapping("/{interestId}/subscriptions")
+    public ResponseEntity<Void> unsubscribeInterest(@PathVariable UUID interestId, @RequestUserId UUID userId) {
+        subscriptionService.unsubscribeInterest(interestId, userId);
+        return ResponseEntity.noContent().build();
     }
 }
