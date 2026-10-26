@@ -12,7 +12,9 @@ import com.sprint.monew.interest.domain.exception.SubscriptionNotFoundException;
 import com.sprint.monew.interest.web.dto.SubscriptionDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +34,17 @@ public class SubscriptionService {
             throw new AlreadySubscribedException(userId, interestId);
         }
 
-        Subscription savedSubscription = subscriptionRepository.save(new Subscription(userId, interest));
-        interestRepository.increaseSubscriberCount(interestId);
+        Subscription savedSubscription;
+        try {
+            savedSubscription = subscriptionRepository.saveAndFlush(new Subscription(userId, interest));
+        } catch (DataIntegrityViolationException e) {
+            if (isDuplicateSubscriptionViolation(e)) {
+                throw new AlreadySubscribedException(userId, interestId);
+            }
+            throw e;
+        }
 
+        interestRepository.increaseSubscriberCount(interestId);
         Interest updatedInterest = findInterestOrThrow(interestId);
 
         eventPublisher.publishEvent(new InterestSubscribedEvent(
@@ -52,11 +62,10 @@ public class SubscriptionService {
     public void unsubscribeInterest(UUID interestId, UUID userId) {
         findInterestOrThrow(interestId);
 
-        Subscription subscription = subscriptionRepository
-                .findByUserIdAndInterestId(userId, interestId)
-                .orElseThrow(() -> new SubscriptionNotFoundException(userId, interestId));
-
-        subscriptionRepository.delete(subscription);
+        int deleted = subscriptionRepository.deleteByUserIdAndInterestId(userId, interestId);
+        if (deleted == 0) {
+            throw new SubscriptionNotFoundException(userId, interestId);
+        }
         interestRepository.decreaseSubscriberCount(interestId);
 
         eventPublisher.publishEvent(new InterestUnsubscribedEvent(userId, interestId));
@@ -64,5 +73,26 @@ public class SubscriptionService {
 
     private Interest findInterestOrThrow(UUID interestId) {
         return interestRepository.findById(interestId).orElseThrow(() -> new InterestNotFoundException(interestId));
+    }
+
+    private boolean isDuplicateSubscriptionViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException cve) {
+                if ("23505".equals(cve.getSQLState())) {
+                    return true;
+                }
+                String constraintName = cve.getConstraintName();
+                if (constraintName != null && constraintName.toLowerCase().contains("user_id")) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        String message = e.getMostSpecificCause().getMessage();
+        return message != null
+                && (message.contains("user_id")
+                        || message.contains("uk_subscriptions")
+                        || message.contains("duplicate key"));
     }
 }

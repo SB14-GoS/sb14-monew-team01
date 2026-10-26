@@ -17,10 +17,12 @@ import com.sprint.monew.interest.domain.exception.AlreadySubscribedException;
 import com.sprint.monew.interest.domain.exception.InterestNotFoundException;
 import com.sprint.monew.interest.domain.exception.SubscriptionNotFoundException;
 import com.sprint.monew.interest.web.dto.SubscriptionDto;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,7 +68,7 @@ class SubscriptionServiceTest {
         given(interestRepository.findById(interestId)).willReturn(Optional.of(interest));
         given(subscriptionRepository.existsByUserIdAndInterestId(userId, interestId))
                 .willReturn(false);
-        given(subscriptionRepository.save(any(Subscription.class))).willReturn(subscription);
+        given(subscriptionRepository.saveAndFlush(any(Subscription.class))).willReturn(subscription);
 
         // when
         SubscriptionDto result = subscriptionService.subscribeInterest(interestId, userId);
@@ -97,7 +100,7 @@ class SubscriptionServiceTest {
         assertThatThrownBy(() -> subscriptionService.subscribeInterest(nonExistentId, userId))
                 .isInstanceOf(InterestNotFoundException.class);
 
-        verify(subscriptionRepository, never()).save(any(Subscription.class));
+        verify(subscriptionRepository, never()).saveAndFlush(any(Subscription.class));
     }
 
     @Test
@@ -116,7 +119,33 @@ class SubscriptionServiceTest {
         assertThatThrownBy(() -> subscriptionService.subscribeInterest(interestId, userId))
                 .isInstanceOf(AlreadySubscribedException.class);
 
-        verify(subscriptionRepository, never()).save(any(Subscription.class));
+        verify(subscriptionRepository, never()).saveAndFlush(any(Subscription.class));
+        verify(interestRepository, never()).increaseSubscriberCount(any());
+    }
+
+    @Test
+    @DisplayName("관심사 구독 실패 - 동시 요청으로 유니크 제약 조건 위반 발생 시 AlreadySubscribedException으로 변환된다")
+    void subscribeInterest_Fail_ConcurrentUniqueConstraintViolation() {
+        // given
+        UUID interestId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Interest interest = new Interest("IT", List.of("AI"));
+
+        given(interestRepository.findById(interestId)).willReturn(Optional.of(interest));
+        given(subscriptionRepository.existsByUserIdAndInterestId(userId, interestId))
+                .willReturn(false);
+
+        ConstraintViolationException cve = new ConstraintViolationException(
+                "duplicate key value violates unique constraint",
+                new SQLException("duplicate key", "23505"),
+                "uk_subscriptions_user_id_interest_id");
+        given(subscriptionRepository.saveAndFlush(any(Subscription.class)))
+                .willThrow(new DataIntegrityViolationException("duplicate key", cve));
+
+        // when & then
+        assertThatThrownBy(() -> subscriptionService.subscribeInterest(interestId, userId))
+                .isInstanceOf(AlreadySubscribedException.class);
+
         verify(interestRepository, never()).increaseSubscriberCount(any());
     }
 
@@ -127,17 +156,16 @@ class SubscriptionServiceTest {
         UUID interestId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Interest interest = new Interest("IT", List.of("AI"));
-        Subscription subscription = new Subscription(userId, interest);
 
         given(interestRepository.findById(interestId)).willReturn(Optional.of(interest));
-        given(subscriptionRepository.findByUserIdAndInterestId(userId, interestId))
-                .willReturn(Optional.of(subscription));
+        given(subscriptionRepository.deleteByUserIdAndInterestId(userId, interestId))
+                .willReturn(1);
 
         // when
         subscriptionService.unsubscribeInterest(interestId, userId);
 
         // then
-        verify(subscriptionRepository).delete(subscription);
+        verify(subscriptionRepository).deleteByUserIdAndInterestId(userId, interestId);
         verify(interestRepository).decreaseSubscriberCount(interestId);
         verify(eventPublisher).publishEvent(new InterestUnsubscribedEvent(userId, interestId));
     }
@@ -155,11 +183,11 @@ class SubscriptionServiceTest {
         assertThatThrownBy(() -> subscriptionService.unsubscribeInterest(nonExistentId, userId))
                 .isInstanceOf(InterestNotFoundException.class);
 
-        verify(subscriptionRepository, never()).delete(any(Subscription.class));
+        verify(subscriptionRepository, never()).deleteByUserIdAndInterestId(any(), any());
     }
 
     @Test
-    @DisplayName("관심사 구독 취소 실패 - 구독 내역이 없으면 SubscriptionNotFoundException이 발생한다")
+    @DisplayName("관심사 구독 취소 실패 - 삭제된 행이 0개(미구독 상태)면 SubscriptionNotFoundException이 발생한다")
     void unsubscribeInterest_Fail_SubscriptionNotFound() {
         // given
         UUID interestId = UUID.randomUUID();
@@ -167,8 +195,8 @@ class SubscriptionServiceTest {
         Interest interest = new Interest("IT", List.of("AI"));
 
         given(interestRepository.findById(interestId)).willReturn(Optional.of(interest));
-        given(subscriptionRepository.findByUserIdAndInterestId(userId, interestId))
-                .willReturn(Optional.empty());
+        given(subscriptionRepository.deleteByUserIdAndInterestId(userId, interestId))
+                .willReturn(0);
 
         // when & then
         assertThatThrownBy(() -> subscriptionService.unsubscribeInterest(interestId, userId))
