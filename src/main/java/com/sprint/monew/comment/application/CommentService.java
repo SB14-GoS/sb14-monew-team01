@@ -8,6 +8,7 @@ import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
+import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.web.dto.CommentDto;
@@ -102,6 +103,18 @@ public class CommentService {
 
         return new CursorPageResponse<>(
                 dtoContent, page.nextCursor(), page.nextAfter(), page.size(), page.totalElements(), page.hasNext());
+    }
+
+    @Transactional
+    public CommentDto update(UUID commentId, UUID userId, String content) {
+        Comment comment =
+                commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
+
+        comment.updateContent(userId, content);
+        UserSummary user = userQueryApi.getSummary(userId);
+        boolean likeByMe = commentRepository.existsByCommentIdAndUserId(commentId, userId);
+
+        return CommentDto.from(comment, user.nickname(), likeByMe);
     }
 
     // ========================================================================================

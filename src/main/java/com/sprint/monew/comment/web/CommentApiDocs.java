@@ -2,6 +2,7 @@ package com.sprint.monew.comment.web;
 
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.comment.web.dto.CommentRegisterRequest;
+import com.sprint.monew.comment.web.dto.CommentUpdateRequest;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
@@ -19,4 +20,7 @@ public interface CommentApiDocs {
     @Operation(summary = "댓글 전체 읽기")
     ResponseEntity<CursorPageResponse<CommentDto>> readAll(
             UUID requesterId, UUID articleId, String orderBy, SortDirection direction, CursorRequest request);
+
+    @Operation(summary = "댓글 수정")
+    ResponseEntity<CommentDto> update(UUID commentId, UUID userId, CommentUpdateRequest request);
 }
