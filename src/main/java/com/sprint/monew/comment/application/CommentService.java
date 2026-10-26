@@ -3,6 +3,7 @@ package com.sprint.monew.comment.application;
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
+import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
@@ -114,6 +115,8 @@ public class CommentService {
         UserSummary user = userQueryApi.getSummary(userId);
         boolean likeByMe = commentRepository.existsByCommentIdAndUserId(commentId, userId);
 
+        eventPublisher.publishEvent(toUpdatedEvent(comment));
+
         return CommentDto.from(comment, user.nickname(), likeByMe);
     }
 
@@ -131,6 +134,10 @@ public class CommentService {
                 comment.getContent(),
                 comment.getLikeCount(),
                 comment.getCreatedAt());
+    }
+
+    private CommentUpdatedEvent toUpdatedEvent(Comment comment) {
+        return new CommentUpdatedEvent(comment.getId(), comment.getUserId(), comment.getContent());
     }
 
     // 정렬 기준에 맞는 다음 페이지용 cursor 문자열을 생성한다.
