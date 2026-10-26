@@ -1,13 +1,21 @@
 package com.sprint.monew.user.application;
 
+import com.sprint.monew.user.api.UserQueryApi;
+import com.sprint.monew.user.api.UserSummary;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
+import com.sprint.monew.user.domain.UserNotFoundException;
 import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class UserService {
+public class UserService implements UserQueryApi {
     private static final String DUMMY_PASSWORD = "monew-timing-safe-dummy";
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,5 +66,34 @@ public class UserService {
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
         return e.getCause() instanceof ConstraintViolationException violationException
                 && User.EMAIL_UNIQUE_CONSTRAINT.equalsIgnoreCase(violationException.getConstraintName());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public UserSummary getSummary(UUID userId) {
+        User target = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+
+        return new UserSummary(target.getId(), target.getNickname());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public Map<UUID, UserSummary> getSummaries(Set<UUID> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<User> users = userRepository.findAll().stream()
+                .filter(user -> userIds.contains(user.getId()))
+                .toList();
+
+        return users.stream()
+                .collect(Collectors.toMap(User::getId, user -> new UserSummary(user.getId(), user.getNickname())));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public boolean exists(UUID userId) {
+        return userRepository.findById(userId).map(user -> !user.isDeleted()).orElse(false);
     }
 }
