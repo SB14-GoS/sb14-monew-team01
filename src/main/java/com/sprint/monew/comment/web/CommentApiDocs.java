@@ -18,5 +18,5 @@ public interface CommentApiDocs {
 
     @Operation(summary = "댓글 전체 읽기")
     ResponseEntity<CursorPageResponse<CommentDto>> readAll(
-            UUID requestId, UUID articleId, String commentOrderBy, SortDirection direction, CursorRequest request);
+            UUID requesterId, UUID articleId, String orderBy, SortDirection direction, CursorRequest request);
 }

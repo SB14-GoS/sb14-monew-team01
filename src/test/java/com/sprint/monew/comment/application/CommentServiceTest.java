@@ -77,7 +77,7 @@ class CommentServiceTest {
         then(articleCommandApi).should().increaseCommentCount(articleId);
         ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
-        org.assertj.core.api.Assertions.assertThat(eventCaptor.getValue())
+        assertThat(eventCaptor.getValue())
                 .extracting(
                         CommentCreatedEvent::articleId,
                         CommentCreatedEvent::articleTitle,
@@ -86,8 +86,8 @@ class CommentServiceTest {
                         CommentCreatedEvent::content,
                         CommentCreatedEvent::likeCount)
                 .containsExactly(articleId, "기사 제목", userId, "댓글작성자", "좋은 기사네요.", 0L);
-        org.assertj.core.api.Assertions.assertThat(comment.userNickname()).isEqualTo("댓글작성자");
-        org.assertj.core.api.Assertions.assertThat(comment.likedByMe()).isFalse();
+        assertThat(comment.userNickname()).isEqualTo("댓글작성자");
+        assertThat(comment.likedByMe()).isFalse();
     }
 
     @Test

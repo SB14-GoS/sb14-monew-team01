@@ -16,22 +16,24 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/comments")
 public class CommentController implements CommentApiDocs {
     private final CommentService commentService;
 
-    @PostMapping("api/comments")
+    @PostMapping
     @Override
     public ResponseEntity<CommentDto> register(@Valid @RequestBody CommentRegisterRequest request) {
         CommentDto commentDto = commentService.register(request.articleId(), request.userId(), request.content());
         return ResponseEntity.status(HttpStatus.CREATED).body(commentDto);
     }
 
-    @GetMapping("api/comments")
+    @GetMapping
     @Override
     public ResponseEntity<CursorPageResponse<CommentDto>> readAll(
             @RequestUserId UUID requesterId,
