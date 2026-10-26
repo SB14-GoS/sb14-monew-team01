@@ -45,6 +45,18 @@ public class Notification extends BaseEntity {
         this.confirmedAt = null;
     }
 
+    // 기사 등록 알림 생성 팩토리 메서드
+    public static Notification ofInterestArticle(UUID userId, UUID interestId, String interestName, long articleCount) {
+        String content = String.format("%s와 관련된 기사가 %d건 등록되었습니다.", interestName, articleCount);
+        return new Notification(userId, content, ResourceType.INTEREST, interestId);
+    }
+
+    // 댓글 좋아요 알림 생성 팩토리 메서드
+    public static Notification ofCommentLike(UUID receiverUserId, UUID commentId, String likerNickname) {
+        String content = String.format("%s님이 나의 댓글을 좋아합니다.", likerNickname);
+        return new Notification(receiverUserId, content, ResourceType.COMMENT, commentId);
+    }
+
     // 알림 확인 시 사용할 메서드
     public void markAsRead() {
         if (!this.isConfirmed) {
