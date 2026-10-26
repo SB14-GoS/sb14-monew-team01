@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
+import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
@@ -254,6 +255,8 @@ class CommentServiceTest {
         UUID userId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-10-26T01:00:00Z");
         Comment comment = mockComment(articleId, userId, createdAt, 3L);
+        given(comment.getId()).willReturn(commentId);
+        given(comment.getContent()).willReturn("수정한 댓글");
         given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "작성자"));
         given(commentRepository.existsByCommentIdAndUserId(commentId, userId)).willReturn(true);
@@ -261,6 +264,11 @@ class CommentServiceTest {
         CommentDto response = commentService.update(commentId, userId, "수정한 댓글");
 
         verify(comment).updateContent(userId, "수정한 댓글");
+        ArgumentCaptor<CommentUpdatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentUpdatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue())
+                .extracting(CommentUpdatedEvent::commentId, CommentUpdatedEvent::userId, CommentUpdatedEvent::content)
+                .containsExactly(commentId, userId, "수정한 댓글");
         assertThat(response)
                 .extracting(CommentDto::userNickname, CommentDto::likeCount, CommentDto::likedByMe)
                 .containsExactly("작성자", 3L, true);
@@ -275,6 +283,7 @@ class CommentServiceTest {
                 .isInstanceOf(CommentNotFoundException.class);
 
         then(userQueryApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     @Test
@@ -291,6 +300,7 @@ class CommentServiceTest {
                 .isInstanceOf(CommentAccessDeniedException.class);
 
         then(userQueryApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     private Comment mockComment(UUID articleId, UUID userId, Instant createdAt, long likeCount) {
