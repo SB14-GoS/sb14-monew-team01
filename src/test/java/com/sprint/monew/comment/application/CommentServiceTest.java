@@ -14,6 +14,7 @@ import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
+import com.sprint.monew.comment.domain.CommentLikeRepository;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
@@ -47,6 +48,9 @@ class CommentServiceTest {
 
     @Mock
     private CommentRepository commentRepository;
+
+    @Mock
+    private CommentLikeRepository commentLikeRepository;
 
     @Mock
     private ArticleQueryApi articleQueryApi;
@@ -259,7 +263,8 @@ class CommentServiceTest {
         given(comment.getContent()).willReturn("수정한 댓글");
         given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
         given(userQueryApi.getSummary(userId)).willReturn(new UserSummary(userId, "작성자"));
-        given(commentRepository.existsByCommentIdAndUserId(commentId, userId)).willReturn(true);
+        given(commentLikeRepository.existsByComment_IdAndUserId(commentId, userId))
+                .willReturn(true);
 
         CommentDto response = commentService.update(commentId, userId, "수정한 댓글");
 

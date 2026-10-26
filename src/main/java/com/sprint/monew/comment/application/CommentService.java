@@ -5,6 +5,7 @@ import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
+import com.sprint.monew.comment.domain.CommentLikeRepository;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentService {
 
     private final CommentRepository commentRepository;
+    private final CommentLikeRepository commentLikeRepository;
     private final ArticleQueryApi articleQueryApi;
     private final ArticleCommandApi articleCommandApi;
     private final UserQueryApi userQueryApi;
@@ -113,7 +115,7 @@ public class CommentService {
 
         comment.updateContent(userId, content);
         UserSummary user = userQueryApi.getSummary(userId);
-        boolean likeByMe = commentRepository.existsByCommentIdAndUserId(commentId, userId);
+        boolean likeByMe = commentLikeRepository.existsByComment_IdAndUserId(commentId, userId);
 
         eventPublisher.publishEvent(toUpdatedEvent(comment));
 
