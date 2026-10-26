@@ -1,8 +1,5 @@
 package com.sprint.monew.support;
 
-import static org.mockito.Mockito.mock;
-
-import com.sprint.monew.user.api.UserQueryApi;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -15,15 +12,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfig {
-
-    /**
-     * Article·User 모듈의 구현체가 추가되기 전까지 CommentService가 생성될 수 있도록 한다.
-     * 실제 구현체가 생기면 이 테스트 대역을 제거한다.
-     */
-    @Bean
-    UserQueryApi userQueryApi() {
-        return mock(UserQueryApi.class);
-    }
 
     @Bean
     @ServiceConnection
