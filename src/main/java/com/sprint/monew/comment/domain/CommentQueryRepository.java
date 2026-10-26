@@ -11,4 +11,6 @@ public interface CommentQueryRepository {
             UUID articleId, UUID requesterId, CommentOrderBy orderBy, SortDirection direction, CursorRequest request);
 
     long countByArticleId(UUID articleId);
+
+    boolean existsByCommentIdAndUserId(UUID commentId, UUID userId);
 }

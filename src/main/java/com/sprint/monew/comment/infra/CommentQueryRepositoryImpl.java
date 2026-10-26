@@ -1,5 +1,7 @@
 package com.sprint.monew.comment.infra;
 
+import static com.sprint.monew.comment.domain.QCommentLike.commentLike;
+
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -63,6 +65,16 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
                 .where(comment.articleId.eq(articleId), comment.deletedAt.isNull())
                 .fetchOne();
         return count == null ? 0L : count;
+    }
+
+    @Override
+    public boolean existsByCommentIdAndUserId(UUID commentId, UUID userId) {
+        return queryFactory
+                        .selectOne()
+                        .from(commentLike)
+                        .where(commentLike.comment.id.eq(commentId), commentLike.userId.eq(userId))
+                        .fetchFirst()
+                != null;
     }
 
     // ========================================================================================
