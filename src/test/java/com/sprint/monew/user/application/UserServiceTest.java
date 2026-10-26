@@ -11,12 +11,16 @@ import static org.mockito.Mockito.verify;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
+import com.sprint.monew.user.domain.UserNotFoundException;
 import com.sprint.monew.user.domain.UserRepository;
+import com.sprint.monew.user.domain.UserUpdateForbiddenException;
 import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
+import com.sprint.monew.user.web.dto.UserUpdateRequest;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -159,5 +163,51 @@ public class UserServiceTest {
         assertThatThrownBy(() -> userService.login(new UserLoginRequest("woody@monew.com", "monew1!")))
                 .isInstanceOf(LoginFailedException.class);
         verify(passwordEncoder).matches("monew1!", "encoded-password");
+    }
+
+    @Test
+    @DisplayName("본인이면 닉네임을 수정한다")
+    void updateNickname() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        UserDto result = userService.updateNickname(userId, userId, new UserUpdateRequest("보안관우디"));
+
+        assertThat(result.nickname()).isEqualTo("보안관우디");
+        assertThat(user.getNickname()).isEqualTo("보안관우디");
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 정보는 수정할 수 없다")
+    void updateNicknameOfOtherUser() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> userService.updateNickname(userId, otherUserId, new UserUpdateRequest("버즈")))
+                .isInstanceOf(UserUpdateForbiddenException.class);
+        verify(userRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자면 수정할 수 없다")
+    void updateNicknameOfUnknownUser() {
+        UUID userId = UUID.randomUUID();
+        given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateNickname(userId, userId, new UserUpdateRequest("우디")))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 사용자는 수정할 수 없다")
+    void updateNicknameOfDeletedUser() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        user.softDelete();
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.updateNickname(userId, userId, new UserUpdateRequest("우디")))
+                .isInstanceOf(UserNotFoundException.class);
     }
 }
