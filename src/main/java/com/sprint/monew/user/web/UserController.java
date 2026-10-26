@@ -2,6 +2,7 @@ package com.sprint.monew.user.web;
 
 import com.sprint.monew.user.application.UserService;
 import com.sprint.monew.user.web.dto.UserDto;
+import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,5 +22,12 @@ public class UserController implements UserApiDocs {
     public ResponseEntity<UserDto> register(@Valid @RequestBody UserRegisterRequest request) {
         UserDto result = userService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    @Override
+    @PostMapping("/api/users/login")
+    public ResponseEntity<UserDto> login(@Valid @RequestBody UserLoginRequest request) {
+        UserDto result = userService.login(request);
+        return ResponseEntity.status(HttpStatus.OK).body(result);
     }
 }
