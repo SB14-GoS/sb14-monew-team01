@@ -9,7 +9,6 @@ import com.sprint.monew.comment.domain.CommentQueryRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.QComment;
 import com.sprint.monew.comment.domain.QCommentLike;
-import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
 import java.time.Instant;
@@ -43,7 +42,7 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
                 .where(
                         comment.articleId.eq(articleId),
                         comment.deletedAt.isNull(),
-                        cursorCondition(comment, articleId, request, orderBy, direction))
+                        cursorCondition(comment, request, orderBy, direction))
                 .orderBy(orderSpecifiers(comment, orderBy, direction))
                 .limit(request.limit() + 1L)
                 .fetch();
@@ -71,16 +70,9 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
 
     // 첫 페이지는 비워 두고 다음 페이지는 정렬 기준에 맞는 cursor 조건을 반환한다.
     private BooleanExpression cursorCondition(
-            QComment comment, UUID articleId, CursorRequest request, CommentOrderBy orderBy, SortDirection direction) {
-
-        // 첫 페이지
-        if (request.cursor() == null && request.after() == null) {
+            QComment comment, CursorRequest request, CommentOrderBy orderBy, SortDirection direction) {
+        if (request.cursor() == null) {
             return null;
-        }
-
-        // cursor / after 중 하나만 온 잘못된 요청
-        if (request.cursor() == null || request.after() == null) {
-            throw new InvalidCommentCursorException(request.cursor());
         }
 
         return switch (orderBy) {
@@ -110,11 +102,6 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     // 좋아요 수와 댓글 ID를 기준으로 다음 페이지 조건을 생성한다.
     private BooleanExpression likeCountCursorCondition(
             QComment comment, CursorRequest request, SortDirection direction) {
-
-        if (request.cursor() == null || request.after() == null) {
-            return null;
-        }
-
         boolean asc = direction == SortDirection.ASC;
 
         LikeCountCursor cursor = parseLikeCountCursor(request.cursor());
@@ -131,11 +118,6 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
     // 생성 시각과 댓글 ID를 기준으로 다음 페이지 조건을 생성한다.
     private BooleanExpression createdAtCursorCondition(
             QComment comment, CursorRequest request, SortDirection direction) {
-
-        if (request.after() == null || request.cursor() == null) {
-            return null;
-        }
-
         UUID cursorId = parseCursorId(request.cursor());
         Instant after = request.after();
         boolean asc = direction == SortDirection.ASC;
@@ -147,26 +129,18 @@ public class CommentQueryRepositoryImpl implements CommentQueryRepository {
 
     // 생성 시각 정렬 cursor의 댓글 ID를 UUID로 변환한다.
     private UUID parseCursorId(String cursor) {
-        try {
-            return UUID.fromString(cursor);
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidCommentCursorException(cursor);
-        }
+        return UUID.fromString(cursor);
     }
 
     // 좋아요 수 정렬 cursor의 "likeCount_commentId" 값을 분리한다.
     private LikeCountCursor parseLikeCountCursor(String cursor) {
-        try {
-            String[] values = cursor.split("_", 2);
+        String[] values = cursor.split("_", 2);
 
-            if (values.length != 2) {
-                throw new IllegalArgumentException();
-            }
-
-            return new LikeCountCursor(Long.parseLong(values[0]), UUID.fromString(values[1]));
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidCommentCursorException(cursor);
+        if (values.length != 2) {
+            throw new IllegalArgumentException();
         }
+
+        return new LikeCountCursor(Long.parseLong(values[0]), UUID.fromString(values[1]));
     }
 
     // 좋아요 수 정렬의 커서 기준값을 보관한다.

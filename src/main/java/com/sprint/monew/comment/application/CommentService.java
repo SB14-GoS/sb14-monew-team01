@@ -10,6 +10,7 @@ import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
+import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
@@ -64,6 +65,7 @@ public class CommentService {
             throw new CommentArticleNotFoundException(articleId);
         }
         CommentOrderBy commentOrderBy = CommentOrderBy.from(orderBy);
+        validateCursorRequest(request, commentOrderBy);
 
         List<CommentSearchResult> comments =
                 commentRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request);
@@ -132,5 +134,37 @@ public class CommentService {
             case CREATED_AT -> comment.getId().toString();
             case LIKE_COUNT -> comment.getLikeCount() + "_" + comment.getId();
         };
+    }
+
+    // cursor와 after의 조합 및 정렬 기준별 cursor 형식을 검증한다.
+    private void validateCursorRequest(CursorRequest request, CommentOrderBy orderBy) {
+        if (request.cursor() == null && request.after() == null) {
+            return;
+        }
+
+        if (request.cursor() == null || request.after() == null) {
+            throw new InvalidCommentCursorException(request.cursor());
+        }
+
+        try {
+            switch (orderBy) {
+                case CREATED_AT -> UUID.fromString(request.cursor());
+                case LIKE_COUNT -> parseLikeCountCursor(request.cursor());
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidCommentCursorException(request.cursor());
+        }
+    }
+
+    // 좋아요 수 정렬 cursor의 "likeCount_commentId" 값을 검증한다.
+    private void parseLikeCountCursor(String cursor) {
+        String[] values = cursor.split("_", 2);
+
+        if (values.length != 2) {
+            throw new IllegalArgumentException();
+        }
+
+        Long.parseLong(values[0]);
+        UUID.fromString(values[1]);
     }
 }

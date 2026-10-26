@@ -1,6 +1,7 @@
 package com.sprint.monew.comment.web;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sprint.monew.comment.application.CommentService;
+import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -165,6 +168,81 @@ class CommentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(commentService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"articleId", "orderBy", "direction"})
+    @DisplayName("필수 댓글 목록 조회 파라미터가 없으면 서비스 호출 전에 400을 반환한다")
+    void rejectsMissingRequiredReadParameter(String missingParameter) throws Exception {
+        UUID requesterId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+
+        var request = get("/api/comments")
+                .header("Monew-Request-User-ID", requesterId)
+                .param("limit", "10");
+
+        if (!missingParameter.equals("articleId")) {
+            request.param("articleId", articleId.toString());
+        }
+        if (!missingParameter.equals("orderBy")) {
+            request.param("orderBy", "createdAt");
+        }
+        if (!missingParameter.equals("direction")) {
+            request.param("direction", "ASC");
+        }
+
+        mockMvc.perform(request).andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("articleId가 UUID 형식이 아니면 서비스 호출 전에 400을 반환한다")
+    void rejectsInvalidArticleId() throws Exception {
+        mockMvc.perform(get("/api/comments")
+                        .header("Monew-Request-User-ID", UUID.randomUUID())
+                        .param("articleId", "not-a-uuid")
+                        .param("orderBy", "createdAt")
+                        .param("direction", "ASC")
+                        .param("limit", "10"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("direction이 지원하지 않는 값이면 서비스 호출 전에 400을 반환한다")
+    void rejectsInvalidDirection() throws Exception {
+        mockMvc.perform(get("/api/comments")
+                        .header("Monew-Request-User-ID", UUID.randomUUID())
+                        .param("articleId", UUID.randomUUID().toString())
+                        .param("orderBy", "createdAt")
+                        .param("direction", "INVALID")
+                        .param("limit", "10"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentService);
+    }
+
+    @Test
+    @DisplayName("orderBy가 지원하지 않는 값이면 400을 반환한다")
+    void rejectsInvalidOrderBy() throws Exception {
+        UUID requesterId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        CursorRequest request = new CursorRequest(null, null, 10);
+        willThrow(new InvalidCommentOrderByException("invalid"))
+                .given(commentService)
+                .search(articleId, requesterId, "invalid", SortDirection.ASC, request);
+
+        mockMvc.perform(get("/api/comments")
+                        .header("Monew-Request-User-ID", requesterId)
+                        .param("articleId", articleId.toString())
+                        .param("orderBy", "invalid")
+                        .param("direction", "ASC")
+                        .param("limit", "10"))
+                .andExpect(status().isBadRequest());
+
+        verify(commentService).search(articleId, requesterId, "invalid", SortDirection.ASC, request);
     }
 
     private static Stream<String> missingArticleIdRequests() {

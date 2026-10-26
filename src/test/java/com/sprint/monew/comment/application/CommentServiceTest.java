@@ -19,6 +19,7 @@ import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
+import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorRequest;
@@ -27,6 +28,8 @@ import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -138,15 +141,13 @@ class CommentServiceTest {
         UUID requesterId = UUID.randomUUID();
         UUID firstUserId = UUID.randomUUID();
         UUID secondUserId = UUID.randomUUID();
-        UUID thirdUserId = UUID.randomUUID();
         Instant firstCreatedAt = Instant.parse("2026-10-26T01:00:00Z");
         Instant secondCreatedAt = Instant.parse("2026-10-26T01:01:00Z");
-        Instant thirdCreatedAt = Instant.parse("2026-10-26T01:02:00Z");
         CursorRequest request = new CursorRequest(null, null, 2);
 
         Comment firstComment = mockComment(articleId, firstUserId, firstCreatedAt, 10L);
         Comment secondComment = mockComment(articleId, secondUserId, secondCreatedAt, 5L);
-        Comment thirdComment = mockComment(articleId, thirdUserId, thirdCreatedAt, 1L);
+        Comment thirdComment = mock(Comment.class);
 
         given(articleQueryApi.exists(articleId)).willReturn(true);
         given(commentRepository.findByArticleId(
@@ -156,9 +157,10 @@ class CommentServiceTest {
                         new CommentSearchResult(secondComment, false),
                         new CommentSearchResult(thirdComment, true)));
         given(commentRepository.countByArticleId(articleId)).willReturn(3L);
-        given(userQueryApi.getSummary(firstUserId)).willReturn(new UserSummary(firstUserId, "작성자1"));
-        given(userQueryApi.getSummary(secondUserId)).willReturn(new UserSummary(secondUserId, "작성자2"));
-        given(userQueryApi.getSummary(thirdUserId)).willReturn(new UserSummary(thirdUserId, "작성자3"));
+        given(userQueryApi.getSummaries(Set.of(firstUserId, secondUserId)))
+                .willReturn(Map.of(
+                        firstUserId, new UserSummary(firstUserId, "작성자1"),
+                        secondUserId, new UserSummary(secondUserId, "작성자2")));
 
         var response = commentService.search(articleId, requesterId, "likeCount", SortDirection.DESC, request);
 
@@ -171,10 +173,59 @@ class CommentServiceTest {
                         responseValue -> responseValue.totalElements(),
                         responseValue -> responseValue.nextCursor(),
                         responseValue -> responseValue.nextAfter())
-                .containsExactly(true, 2, 3L, secondComment.getId().toString(), secondCreatedAt);
+                .containsExactly(true, 2, 3L, "5_" + secondComment.getId(), secondCreatedAt);
         then(commentRepository)
                 .should()
                 .findByArticleId(articleId, requesterId, CommentOrderBy.LIKE_COUNT, SortDirection.DESC, request);
+        then(userQueryApi).should().getSummaries(Set.of(firstUserId, secondUserId));
+    }
+
+    @Test
+    void cursor와_after_중_하나만_전달하면_조회_전에_예외가_발생한다() {
+        UUID articleId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+
+        assertThatThrownBy(() -> commentService.search(
+                        articleId,
+                        UUID.randomUUID(),
+                        "createdAt",
+                        SortDirection.ASC,
+                        new CursorRequest(UUID.randomUUID().toString(), null, 10)))
+                .isInstanceOf(InvalidCommentCursorException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 생성순_cursor가_UUID_형식이_아니면_조회_전에_예외가_발생한다() {
+        UUID articleId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+
+        assertThatThrownBy(() -> commentService.search(
+                        articleId,
+                        UUID.randomUUID(),
+                        "createdAt",
+                        SortDirection.ASC,
+                        new CursorRequest("not-a-uuid", Instant.now(), 10)))
+                .isInstanceOf(InvalidCommentCursorException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 좋아요순_cursor가_형식에_맞지_않으면_조회_전에_예외가_발생한다() {
+        UUID articleId = UUID.randomUUID();
+        given(articleQueryApi.exists(articleId)).willReturn(true);
+
+        assertThatThrownBy(() -> commentService.search(
+                        articleId,
+                        UUID.randomUUID(),
+                        "likeCount",
+                        SortDirection.ASC,
+                        new CursorRequest("not-a-like-count-cursor", Instant.now(), 10)))
+                .isInstanceOf(InvalidCommentCursorException.class);
+
+        then(commentRepository).shouldHaveNoInteractions();
     }
 
     @Test
