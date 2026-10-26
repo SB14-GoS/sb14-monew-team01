@@ -15,6 +15,11 @@ class CommentTest {
     private final UUID userId = UUID.randomUUID();
 
     @Test
+    void 한_글자_내용으로_댓글을_생성할_수_있다() {
+        assertThatCode(() -> new Comment(articleId, userId, "a")).doesNotThrowAnyException();
+    }
+
+    @Test
     void 유효한_댓글을_생성할_수_있다() {
         assertThatCode(() -> new Comment(articleId, userId, "a".repeat(500))).doesNotThrowAnyException();
     }
