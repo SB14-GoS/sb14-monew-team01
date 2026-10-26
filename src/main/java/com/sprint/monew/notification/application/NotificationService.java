@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -75,7 +76,7 @@ public class NotificationService {
     }
 
     // 기사 등록 알림 일괄 생성 로직
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createInterestArticleNotifications(UUID interestId, String interestName, long articleCount) {
         if (articleCount <= 0) {
             return;
@@ -94,7 +95,7 @@ public class NotificationService {
     }
 
     // 댓글 좋아요 단건 생성 로직
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createCommentLikeNotification(UUID receiverUserId, UUID commentId, String likerNickname) {
         Notification notification = Notification.ofCommentLike(receiverUserId, commentId, likerNickname);
         notificationRepository.save(notification);
