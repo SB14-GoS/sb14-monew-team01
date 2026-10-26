@@ -21,10 +21,10 @@ public class UserActivityDocument {
     private String email;
     private String nickname;
     private Instant createdAt;
-    private final List<SubscriptionItem> subscriptions = new ArrayList<>();
-    private final List<CommentItem> comments = new ArrayList<>();
-    private final List<CommentLikeItem> commentLikes = new ArrayList<>();
-    private final List<ArticleViewItem> articleViews = new ArrayList<>();
+    private List<SubscriptionItem> subscriptions = new ArrayList<>();
+    private List<CommentItem> comments = new ArrayList<>();
+    private List<CommentLikeItem> commentLikes = new ArrayList<>();
+    private List<ArticleViewItem> articleViews = new ArrayList<>();
 
     public UserActivityDocument(UUID id, String email, String nickname, Instant createdAt) {
         this.id = id;
