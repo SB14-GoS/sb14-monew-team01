@@ -5,4 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface CommentRepository extends JpaRepository<Comment, UUID>, CommentQueryRepository {}
+public interface CommentRepository extends JpaRepository<Comment, UUID>, CommentQueryRepository {
+
+    void deleteAllByArticleId(UUID articleId);
+}
