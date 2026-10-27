@@ -67,4 +67,8 @@ public class Comment extends BaseSoftDeleteEntity {
         }
         this.content = content;
     }
+
+    public void increaseLikeCount() {
+        likeCount++;
+    }
 }
