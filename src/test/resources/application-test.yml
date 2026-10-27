@@ -10,6 +10,10 @@ spring:
     compose:
       enabled: false
 
+  mongodb:
+    representation:
+      uuid: standard
+
 news:
   naver:
     client-id: test-client-id
