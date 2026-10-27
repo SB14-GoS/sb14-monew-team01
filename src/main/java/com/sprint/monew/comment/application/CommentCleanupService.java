@@ -2,8 +2,8 @@ package com.sprint.monew.comment.application;
 
 import com.sprint.monew.comment.api.CommentCommandApi;
 import com.sprint.monew.comment.api.CommentDeletedEvent;
-import com.sprint.monew.comment.domain.CommentLikeRepository;
-import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
+import com.sprint.monew.comment.domain.repository.CommentRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
