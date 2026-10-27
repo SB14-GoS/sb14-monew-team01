@@ -22,4 +22,7 @@ public interface UserApiDocs {
 
     @Operation(summary = "사용자 논리 삭제")
     ResponseEntity<Void> softDelete(UUID userId, UUID requesterId);
+
+    @Operation(summary = "사용자 물리 삭제")
+    ResponseEntity<Void> hardDelete(UUID userId, UUID requesterId);
 }
