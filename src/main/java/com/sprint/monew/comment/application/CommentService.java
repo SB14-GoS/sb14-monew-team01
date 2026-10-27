@@ -149,19 +149,20 @@ public class CommentService {
         Comment comment =
                 commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
 
-        boolean wasActive = !comment.isDeleted();
-
         if (!comment.getUserId().equals(requesterUserId)) {
             throw new CommentAccessDeniedException(commentId, requesterUserId);
         }
 
-        commentRepository.delete(comment);
+        int deleted = commentRepository.hardDeleteIfActive(commentId);
 
-        /* 논리 삭제 안된 댓글 카운트 감소 및 이벤트 발행*/
-        if (wasActive) {
+        if (deleted == 1) {
             articleCommandApi.decreaseCommentCount(comment.getArticleId());
             eventPublisher.publishEvent(toDeletedEvent(comment));
+            return;
         }
+
+        // 이미 논리 삭제된 댓글이라면, 기존 정책대로 물리 삭제만 수행
+        commentRepository.delete(comment);
     }
 
     // ========================================================================================
