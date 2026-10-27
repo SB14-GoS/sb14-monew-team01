@@ -6,15 +6,15 @@ import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.api.CommentDeletedEvent;
 import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
-import com.sprint.monew.comment.domain.CommentLikeRepository;
 import com.sprint.monew.comment.domain.CommentOrderBy;
-import com.sprint.monew.comment.domain.CommentRepository;
-import com.sprint.monew.comment.domain.CommentSearchResult;
 import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
+import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
+import com.sprint.monew.comment.domain.repository.CommentRepository;
+import com.sprint.monew.comment.domain.repository.CommentSearchResult;
 import com.sprint.monew.comment.web.dto.CommentDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
@@ -153,7 +153,7 @@ public class CommentService {
 
         commentRepository.delete(comment);
 
-        /* 논리 삭제 안된 댓글 카운트 감소 */
+        /* 논리 삭제 안된 댓글 카운트 감소 및 이벤트 발행*/
         if (wasActive) {
             articleCommandApi.decreaseCommentCount(comment.getArticleId());
             eventPublisher.publishEvent(toDeletedEvent(comment));

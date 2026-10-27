@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentLike;
-import com.sprint.monew.comment.domain.CommentLikeRepository;
-import com.sprint.monew.comment.domain.CommentRepository;
+import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
+import com.sprint.monew.comment.domain.repository.CommentRepository;
 import com.sprint.monew.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
