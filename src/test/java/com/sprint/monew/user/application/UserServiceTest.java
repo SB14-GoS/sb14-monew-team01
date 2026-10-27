@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.sprint.monew.user.api.UserDeletedEvent;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
@@ -30,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -43,6 +45,9 @@ public class UserServiceTest {
 
     @InjectMocks
     UserService userService;
+
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @Test
     @DisplayName("이미 가입된 이메일이면 회원가입에 실패한다.")
@@ -254,5 +259,53 @@ public class UserServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> userService.softDelete(userId, userId)).isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("본인이면 물리 삭제하고 삭제 이벤트를 발행한다")
+    void hardDelete() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        userService.hardDelete(userId, userId);
+
+        verify(userRepository).delete(user);
+        verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
+    }
+
+    @Test
+    @DisplayName("논리 삭제된 사용자도 물리 삭제할 수 있다")
+    void hardDeleteSoftDeletedUser() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        user.softDelete();
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        userService.hardDelete(userId, userId);
+
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    @DisplayName("다른 사용자는 물리 삭제할 수 없다")
+    void hardDeleteOtherUser() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> userService.hardDelete(userId, otherUserId))
+                .isInstanceOf(UserDeleteForbiddenException.class);
+        verify(userRepository, never()).delete(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자는 물리 삭제할 수 없다")
+    void hardDeleteUnknownUser() {
+        UUID userId = UUID.randomUUID();
+        given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.hardDelete(userId, userId)).isInstanceOf(UserNotFoundException.class);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
