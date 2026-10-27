@@ -39,4 +39,11 @@ public class UserController implements UserApiDocs {
         UserDto result = userService.updateNickname(userId, requesterId, request);
         return ResponseEntity.status(HttpStatus.OK).body(result);
     }
+
+    @Override
+    @DeleteMapping("/api/users/{userId}")
+    public ResponseEntity<Void> softDelete(@PathVariable UUID userId, @RequestUserId UUID requesterId) {
+        userService.softDelete(userId, requesterId);
+        return ResponseEntity.noContent().build();
+    }
 }
