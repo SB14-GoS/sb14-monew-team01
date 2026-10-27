@@ -1,5 +1,6 @@
 package com.sprint.monew.user.application;
 
+import com.sprint.monew.user.api.UserDeletedEvent;
 import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,11 +34,14 @@ public class UserService implements UserQueryApi {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final String dummyEncodedPassword;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository, PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.dummyEncodedPassword = passwordEncoder.encode(DUMMY_PASSWORD);
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -89,6 +94,16 @@ public class UserService implements UserQueryApi {
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(() -> new UserNotFoundException(userId));
         user.softDelete();
+    }
+
+    @Transactional
+    public void hardDelete(UUID userId, UUID requesterId) {
+        if (!userId.equals(requesterId)) {
+            throw new UserDeleteForbiddenException(userId);
+        }
+        User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+        userRepository.delete(user);
+        eventPublisher.publishEvent(new UserDeletedEvent(userId));
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
