@@ -1,7 +1,9 @@
 package com.sprint.monew.comment.web;
 
+import com.sprint.monew.comment.application.CommentLikeService;
 import com.sprint.monew.comment.application.CommentService;
 import com.sprint.monew.comment.web.dto.CommentDto;
+import com.sprint.monew.comment.web.dto.CommentLikeDto;
 import com.sprint.monew.comment.web.dto.CommentRegisterRequest;
 import com.sprint.monew.comment.web.dto.CommentUpdateRequest;
 import com.sprint.monew.global.common.CursorPageResponse;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CommentController implements CommentApiDocs {
 
     private final CommentService commentService;
+    private final CommentLikeService commentLikeService;
 
     @PostMapping
     @Override
@@ -76,5 +79,12 @@ public class CommentController implements CommentApiDocs {
     public ResponseEntity<Void> deleteHard(@PathVariable UUID commentId, @RequestUserId UUID requesterUserId) {
         commentService.deleteHard(commentId, requesterUserId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{commentId}/comment-likes")
+    @Override
+    public ResponseEntity<CommentLikeDto> like(@PathVariable UUID commentId, @RequestUserId UUID requesterUserId) {
+        CommentLikeDto createdLike = commentLikeService.like(commentId, requesterUserId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdLike);
     }
 }

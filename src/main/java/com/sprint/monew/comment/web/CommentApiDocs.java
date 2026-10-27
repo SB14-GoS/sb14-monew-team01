@@ -1,6 +1,7 @@
 package com.sprint.monew.comment.web;
 
 import com.sprint.monew.comment.web.dto.CommentDto;
+import com.sprint.monew.comment.web.dto.CommentLikeDto;
 import com.sprint.monew.comment.web.dto.CommentRegisterRequest;
 import com.sprint.monew.comment.web.dto.CommentUpdateRequest;
 import com.sprint.monew.global.common.CursorPageResponse;
@@ -29,4 +30,7 @@ public interface CommentApiDocs {
 
     @Operation(summary = "댓글 물리 삭제")
     ResponseEntity<Void> deleteHard(UUID commentId, UUID requesterUserId);
+
+    @Operation(summary = "좋아요 생성")
+    ResponseEntity<CommentLikeDto> like(UUID commentId, UUID requesterUserId);
 }
