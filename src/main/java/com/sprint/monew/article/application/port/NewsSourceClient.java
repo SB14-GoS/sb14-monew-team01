@@ -4,7 +4,7 @@ import com.sprint.monew.article.domain.ArticleSource;
 import java.util.Collection;
 import java.util.List;
 
-public interface NewSourceClient {
+public interface NewsSourceClient {
     ArticleSource getSouce();
 
     List<RawArticle> fetch(Collection<String> keywords);
