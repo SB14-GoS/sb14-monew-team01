@@ -135,9 +135,13 @@ public class CommentService {
         if (!comment.getUserId().equals(requesterUserId)) {
             throw new CommentAccessDeniedException(commentId, requesterUserId);
         }
-        comment.softDelete(); /* Dirty checking */
-        articleCommandApi.decreaseCommentCount(comment.getArticleId());
-        eventPublisher.publishEvent(toDeletedEvent(comment));
+
+        int updated = commentRepository.softDeleteIfActive(commentId);
+
+        if (updated == 1) {
+            articleCommandApi.decreaseCommentCount(comment.getArticleId());
+            eventPublisher.publishEvent(toDeletedEvent(comment));
+        }
     }
 
     @Transactional
