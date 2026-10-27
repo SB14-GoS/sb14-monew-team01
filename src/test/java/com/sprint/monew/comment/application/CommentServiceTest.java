@@ -368,6 +368,71 @@ class CommentServiceTest {
         then(eventPublisher).shouldHaveNoInteractions();
     }
 
+    @Test
+    void 활성_댓글을_물리삭제하면_기사_댓글_수를_감소시키고_삭제_이벤트를_발행한다() {
+        UUID commentId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(comment.getId()).willReturn(commentId);
+        given(comment.getArticleId()).willReturn(articleId);
+        given(comment.getUserId()).willReturn(userId);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+
+        commentService.deleteHard(commentId, userId);
+
+        then(commentRepository).should().delete(comment);
+        then(articleCommandApi).should().decreaseCommentCount(articleId);
+        ArgumentCaptor<CommentDeletedEvent> eventCaptor = ArgumentCaptor.forClass(CommentDeletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue())
+                .extracting(CommentDeletedEvent::commentId, CommentDeletedEvent::userId)
+                .containsExactly(commentId, userId);
+    }
+
+    @Test
+    void 논리삭제된_댓글을_물리삭제하면_기사_댓글_수는_감소시키지_않는다() {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(comment.isDeleted()).willReturn(true);
+        given(comment.getUserId()).willReturn(userId);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+
+        commentService.deleteHard(commentId, userId);
+
+        then(commentRepository).should().delete(comment);
+        then(articleCommandApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 작성자가_아닌_사용자는_댓글을_물리삭제할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(comment.getUserId()).willReturn(UUID.randomUUID());
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> commentService.deleteHard(commentId, UUID.randomUUID()))
+                .isInstanceOf(CommentAccessDeniedException.class);
+
+        then(commentRepository).should(never()).delete(comment);
+        then(articleCommandApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 존재하지_않는_댓글은_물리삭제할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        given(commentRepository.findById(commentId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commentService.deleteHard(commentId, UUID.randomUUID()))
+                .isInstanceOf(CommentNotFoundException.class);
+
+        then(articleCommandApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
     private Comment mockComment(UUID articleId, UUID userId, Instant createdAt, long likeCount) {
         Comment comment = mock(Comment.class);
         given(comment.getId()).willReturn(UUID.randomUUID());
