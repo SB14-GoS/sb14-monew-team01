@@ -19,4 +19,7 @@ public interface UserApiDocs {
 
     @Operation(summary = "사용자 정보 수정")
     ResponseEntity<UserDto> updateNickname(UUID userId, UUID requesterId, UserUpdateRequest request);
+
+    @Operation(summary = "사용자 논리 삭제")
+    ResponseEntity<Void> softDelete(UUID userId, UUID requesterId);
 }
