@@ -138,6 +138,25 @@ public class CommentService {
         articleCommandApi.decreaseCommentCount(comment.getArticleId());
     }
 
+    @Transactional
+    public void deleteHard(UUID commentId, UUID requesterUserId) {
+        Comment comment =
+                commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
+
+        boolean wasActive = !comment.isDeleted();
+
+        if (!comment.getUserId().equals(requesterUserId)) {
+            throw new CommentAccessDeniedException(commentId, requesterUserId);
+        }
+
+        commentRepository.delete(comment);
+
+        /* 논리 삭제 안된 댓글 카운트 감소 */
+        if (wasActive) {
+            articleCommandApi.decreaseCommentCount(comment.getArticleId());
+        }
+    }
+
     // ========================================================================================
     // 내부 헬퍼 메서드
 
