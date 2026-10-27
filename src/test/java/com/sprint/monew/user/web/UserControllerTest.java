@@ -221,4 +221,27 @@ public class UserControllerTest {
         mockMvc.perform(delete("/api/users/{userId}", userId)).andExpect(status().isBadRequest());
         verify(userService, never()).softDelete(any(), any());
     }
+
+    @Test
+    @DisplayName("물리 삭제에 성공하면 204를 반환한다")
+    void hardDelete() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/users/{userId}/hard", userId).header("Monew-Request-User-ID", userId.toString()))
+                .andExpect(status().isNoContent());
+        verify(userService).hardDelete(userId, userId);
+    }
+
+    @Test
+    @DisplayName("다른 사용자를 물리 삭제하면 403을 반환한다")
+    void hardDeleteForbidden() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        willThrow(new UserDeleteForbiddenException(userId)).given(userService).hardDelete(userId, otherUserId);
+
+        mockMvc.perform(delete("/api/users/{userId}/hard", userId)
+                        .header("Monew-Request-User-ID", otherUserId.toString()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_DELETE_FORBIDDEN"));
+    }
 }
