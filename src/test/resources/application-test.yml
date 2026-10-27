@@ -9,3 +9,7 @@ spring:
   docker:
     compose:
       enabled: false
+
+  mongodb:
+    representation:
+      uuid: standard

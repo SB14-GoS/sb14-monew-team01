@@ -3,22 +3,15 @@ spring:
     name: monew
   profiles:
     default: local
-
-  docker:
-    compose:
-      enabled: false
-
-  datasource:
-    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/postgres
-    username: ${RDS_USERNAME}
-    password: ${RDS_PASSWORD}
-    driver-class-name: org.postgresql.Driver
-
-
   mongodb:
-    uri: ${MONGO_URI}
+    uri: ${MONGO_URI:mongodb://localhost:27017/monew}
     representation:
-      uuid: standard   # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
+      uuid: standard # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
+  datasource:
+    url: jdbc:postgresql://${RDS_ENDPOINT:localhost}:5432/monew
+    username: ${RDS_USERNAME:monew}
+    password: ${RDS_PASSWORD:monew}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     open-in-view: false
