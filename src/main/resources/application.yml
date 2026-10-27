@@ -3,14 +3,32 @@ spring:
     name: monew
   profiles:
     default: local
+
+  docker:
+    compose:
+      enabled: false
+
+  datasource:
+    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/postgres
+    username: ${RDS_USERNAME}
+    password: ${RDS_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+
   mongodb:
+    uri: ${MONGO_URI}
     representation:
       uuid: standard   # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
+
   jpa:
     open-in-view: false
+    hibernate:
+      ddl-auto: update
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        format_sql: true
+
   batch:
     job:
       enabled: false   # 배치는 스케줄러에서 직접 실행
@@ -27,6 +45,7 @@ management:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"
-
+  level:
+    org.hibernate.SQL: debug
 springdoc:
   paths-to-match: /api/**
