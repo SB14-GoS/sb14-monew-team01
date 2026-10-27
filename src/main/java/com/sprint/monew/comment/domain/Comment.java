@@ -5,10 +5,8 @@ import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentUserIdRequiredException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentContentException;
 import com.sprint.monew.global.common.BaseSoftDeleteEntity;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
@@ -36,10 +34,7 @@ public class Comment extends BaseSoftDeleteEntity {
     @Column(nullable = false)
     private long likeCount = 0L;
 
-    @OneToMany(
-            mappedBy = "comment",
-            cascade = {CascadeType.ALL},
-            fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "comment")
     private List<CommentLike> commentLike = new ArrayList<>();
 
     public Comment(UUID articleId, UUID userId, String content) {
