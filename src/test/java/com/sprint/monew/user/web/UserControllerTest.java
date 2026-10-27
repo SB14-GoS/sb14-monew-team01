@@ -3,8 +3,10 @@ package com.sprint.monew.user.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.sprint.monew.user.application.UserService;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
+import com.sprint.monew.user.domain.UserDeleteForbiddenException;
 import com.sprint.monew.user.domain.UserUpdateForbiddenException;
 import com.sprint.monew.user.web.dto.UserDto;
 import java.time.Instant;
@@ -186,5 +189,36 @@ public class UserControllerTest {
                                 {"nickname": "%s"}
                                 """.formatted(nickname)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("논리 삭제에 성공하면 204를 반환한다")
+    void softDelete() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/users/{userId}", userId).header("Monew-Request-User-ID", userId.toString()))
+                .andExpect(status().isNoContent());
+        verify(userService).softDelete(userId, userId);
+    }
+
+    @Test
+    @DisplayName("다른 사용자를 삭제하면 403을 반환한다")
+    void softDeleteForbidden() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        willThrow(new UserDeleteForbiddenException(userId)).given(userService).softDelete(userId, otherUserId);
+
+        mockMvc.perform(delete("/api/users/{userId}", userId).header("Monew-Request-User-ID", otherUserId.toString()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("USER_DELETE_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("요청자 헤더가 없으면 400을 반환한다")
+    void softDeleteWithoutHeader() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/users/{userId}", userId)).andExpect(status().isBadRequest());
+        verify(userService, never()).softDelete(any(), any());
     }
 }
