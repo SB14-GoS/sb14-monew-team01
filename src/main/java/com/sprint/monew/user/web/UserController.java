@@ -46,4 +46,11 @@ public class UserController implements UserApiDocs {
         userService.softDelete(userId, requesterId);
         return ResponseEntity.noContent().build();
     }
+
+    @Override
+    @DeleteMapping("/api/users/{userId}/hard")
+    public ResponseEntity<Void> hardDelete(@PathVariable UUID userId, @RequestUserId UUID requesterId) {
+        userService.hardDelete(userId, requesterId);
+        return ResponseEntity.noContent().build();
+    }
 }
