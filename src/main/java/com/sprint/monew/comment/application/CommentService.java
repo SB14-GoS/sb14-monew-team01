@@ -153,6 +153,8 @@ public class CommentService {
             throw new CommentAccessDeniedException(commentId, requesterUserId);
         }
 
+        commentLikeRepository.deleteAllByCommentId(commentId);
+
         int deleted = commentRepository.hardDeleteIfActive(commentId);
 
         if (deleted == 1) {
