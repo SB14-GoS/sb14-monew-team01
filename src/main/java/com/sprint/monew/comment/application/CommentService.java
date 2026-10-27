@@ -9,6 +9,7 @@ import com.sprint.monew.comment.domain.CommentLikeRepository;
 import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.CommentSearchResult;
+import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentArticleNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
@@ -121,6 +122,20 @@ public class CommentService {
         eventPublisher.publishEvent(toUpdatedEvent(comment));
 
         return CommentDto.from(comment, user.nickname(), likeByMe);
+    }
+
+    @Transactional
+    public void delete(UUID commentId, UUID requesterUserId) {
+        Comment comment = commentRepository
+                .findById(commentId)
+                .filter(found -> !found.isDeleted())
+                .orElseThrow(() -> new CommentNotFoundException(commentId));
+
+        if (!comment.getUserId().equals(requesterUserId)) {
+            throw new CommentAccessDeniedException(commentId, requesterUserId);
+        }
+        comment.softDelete(); /* Dirty checking */
+        articleCommandApi.decreaseCommentCount(comment.getArticleId());
     }
 
     // ========================================================================================
