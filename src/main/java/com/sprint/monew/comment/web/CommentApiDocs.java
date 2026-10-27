@@ -26,4 +26,7 @@ public interface CommentApiDocs {
 
     @Operation(summary = "댓글 논리 삭제")
     void delete(UUID commentId, UUID requesterUserId);
+
+    @Operation(summary = "댓글 물리 삭제")
+    void deleteHard(UUID commentId, UUID requesterUserId);
 }
