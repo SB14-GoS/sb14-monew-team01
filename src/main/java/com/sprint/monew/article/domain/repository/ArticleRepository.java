@@ -2,6 +2,8 @@ package com.sprint.monew.article.domain.repository;
 
 import com.sprint.monew.article.domain.Article;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,4 +30,7 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     @Query("update Article a set a.commentCount = a.commentCount - 1 "
             + "where a.id = :articleId and a.commentCount > 0")
     int decreaseCommentCount(@Param("articleId") UUID articleId);
+
+    @Query("select a from Article a where a.createdAt >= :from and a.createdAt < :to and a.deletedAt is null")
+    List<Article> findByCreatedAtRange(Instant from, Instant to);
 }
