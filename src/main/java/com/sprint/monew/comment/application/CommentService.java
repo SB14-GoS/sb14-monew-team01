@@ -3,6 +3,7 @@ package com.sprint.monew.comment.application;
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
+import com.sprint.monew.comment.api.CommentDeletedEvent;
 import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentLikeRepository;
@@ -136,6 +137,7 @@ public class CommentService {
         }
         comment.softDelete(); /* Dirty checking */
         articleCommandApi.decreaseCommentCount(comment.getArticleId());
+        eventPublisher.publishEvent(toDeletedEvent(comment));
     }
 
     @Transactional
@@ -154,6 +156,7 @@ public class CommentService {
         /* 논리 삭제 안된 댓글 카운트 감소 */
         if (wasActive) {
             articleCommandApi.decreaseCommentCount(comment.getArticleId());
+            eventPublisher.publishEvent(toDeletedEvent(comment));
         }
     }
 
@@ -175,6 +178,10 @@ public class CommentService {
 
     private CommentUpdatedEvent toUpdatedEvent(Comment comment) {
         return new CommentUpdatedEvent(comment.getId(), comment.getUserId(), comment.getContent());
+    }
+
+    private CommentDeletedEvent toDeletedEvent(Comment comment) {
+        return new CommentDeletedEvent(comment.getId(), comment.getUserId());
     }
 
     // 정렬 기준에 맞는 다음 페이지용 cursor 문자열을 생성한다.
