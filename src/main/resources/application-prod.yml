@@ -7,8 +7,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
   mongodb:
     uri: ${MONGODB_URI}
+
   batch:
     jdbc:
       initialize-schema: always
