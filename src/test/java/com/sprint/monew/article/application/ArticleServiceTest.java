@@ -64,6 +64,43 @@ class ArticleServiceTest {
     private final UUID userId = UUID.randomUUID();
 
     @ParameterizedTest
+    @ValueSource(longs = {0, 1, 3})
+    @DisplayName("댓글 수 감소는 양수일 때만 수행하고 0은 유지한다")
+    void decreasesCommentCountWithoutGoingBelowZero(long initial) {
+        Article article = article(1);
+        ReflectionTestUtils.setField(article, "commentCount", initial);
+        given(articleRepository.findWithLockById(article.getId())).willReturn(Optional.of(article));
+        if (initial > 0) {
+            given(articleRepository.decreaseCommentCount(article.getId())).willReturn(1);
+        }
+
+        articleService.decreaseCommentCount(article.getId());
+
+        verify(articleRepository).findWithLockById(article.getId());
+        if (initial > 0) {
+            verify(articleRepository).decreaseCommentCount(article.getId());
+        }
+        verifyNoMoreInteractions(articleRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("댓글 수 감소는 없거나 논리 삭제된 기사에 예외를 던진다")
+    void rejectsCommentCountDecreaseForMissingOrDeletedArticle(boolean deleted) {
+        Article article = article(1);
+        ReflectionTestUtils.setField(article, "commentCount", 1L);
+        article.softDelete();
+        given(articleRepository.findWithLockById(article.getId()))
+                .willReturn(deleted ? Optional.of(article) : Optional.empty());
+
+        assertThatThrownBy(() -> articleService.decreaseCommentCount(article.getId()))
+                .isInstanceOf(ArticleNotFoundException.class);
+        assertThat(article.getCommentCount()).isEqualTo(1L);
+        verify(articleRepository).findWithLockById(article.getId());
+        verifyNoMoreInteractions(articleRepository);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     @DisplayName("단건 조회는 기사 정보와 요청자의 읽음 여부를 반환한다")
     void readsArticleWithViewedStatus(boolean viewed) {

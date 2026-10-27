@@ -221,6 +221,21 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
         }
     }
 
+    @Transactional
+    @Override
+    public void decreaseCommentCount(UUID articleId) {
+        Article article = articleRepository
+                .findWithLockById(articleId)
+                .filter(target -> !target.isDeleted())
+                .orElseThrow(() -> new ArticleNotFoundException(articleId));
+        if (article.getCommentCount() > 0) {
+            int updated = articleRepository.decreaseCommentCount(articleId);
+            if (updated == 0) {
+                throw new ArticleNotFoundException(articleId);
+            }
+        }
+    }
+
     /* 존재하지 않고, 논리삭제된애들 거르기 */
     private Article findActiveArticle(UUID articleId) {
         return articleRepository
