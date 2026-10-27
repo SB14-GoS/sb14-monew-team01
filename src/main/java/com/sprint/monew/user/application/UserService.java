@@ -5,6 +5,7 @@ import com.sprint.monew.user.api.UserSummary;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
+import com.sprint.monew.user.domain.UserDeleteForbiddenException;
 import com.sprint.monew.user.domain.UserNotFoundException;
 import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.domain.UserUpdateForbiddenException;
@@ -76,6 +77,18 @@ public class UserService implements UserQueryApi {
                 .orElseThrow(() -> new UserNotFoundException(userId));
         user.updateNickname(request.nickname());
         return UserDto.from(user);
+    }
+
+    @Transactional
+    public void softDelete(UUID userId, UUID requesterId) {
+        if (!userId.equals(requesterId)) {
+            throw new UserDeleteForbiddenException(userId);
+        }
+        User user = userRepository
+                .findById(userId)
+                .filter(found -> !found.isDeleted())
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        user.softDelete();
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
+import com.sprint.monew.user.domain.UserDeleteForbiddenException;
 import com.sprint.monew.user.domain.UserNotFoundException;
 import com.sprint.monew.user.domain.UserRepository;
 import com.sprint.monew.user.domain.UserUpdateForbiddenException;
@@ -209,5 +210,49 @@ public class UserServiceTest {
 
         assertThatThrownBy(() -> userService.updateNickname(userId, userId, new UserUpdateRequest("우디")))
                 .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("본인이면 논리 삭제하고 삭제 시각을 기록한다")
+    void softDelete() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        userService.softDelete(userId, userId);
+
+        assertThat(user.isDeleted()).isTrue();
+        assertThat(user.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("다른 사용자는 삭제할 수 없다")
+    void softDeleteOtherUser() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> userService.softDelete(userId, otherUserId))
+                .isInstanceOf(UserDeleteForbiddenException.class);
+        verify(userRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자는 삭제할 수 없다")
+    void softDeleteUnknownUser() {
+        UUID userId = UUID.randomUUID();
+        given(userRepository.findById(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.softDelete(userId, userId)).isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("이미 탈퇴한 사용자는 다시 삭제할 수 없다")
+    void softDeleteAlreadyDeletedUser() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        user.softDelete();
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.softDelete(userId, userId)).isInstanceOf(UserNotFoundException.class);
     }
 }
