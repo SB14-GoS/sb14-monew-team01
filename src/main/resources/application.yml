@@ -32,3 +32,9 @@ logging:
 
 springdoc:
   paths-to-match: /api/**
+
+monew:
+  storage:
+    s3:
+      bucket: ${AWS_S3_BUCKET:monew-local}
+      region: ${AWS_REGION:ap-northeast-2}
