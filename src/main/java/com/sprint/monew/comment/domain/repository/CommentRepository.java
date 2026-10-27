@@ -26,4 +26,12 @@ public interface CommentRepository extends JpaRepository<Comment, UUID>, Comment
           AND c.deletedAt IS NULL
         """)
     int softDeleteIfActive(@Param("commentId") UUID commentId);
+
+    @Modifying
+    @Query("""
+    DELETE FROM Comment c
+    WHERE c.id = :commentId
+      AND c.deletedAt IS NULL
+    """)
+    int hardDeleteIfActive(@Param("commentId") UUID commentId);
 }
