@@ -399,6 +399,7 @@ class CommentServiceTest {
 
         commentService.deleteHard(commentId, userId);
 
+        then(commentLikeRepository).should().deleteAllByCommentId(commentId);
         then(commentRepository).should().hardDeleteIfActive(commentId);
         then(commentRepository).should(never()).delete(comment);
         then(articleCommandApi).should().decreaseCommentCount(articleId);
@@ -420,6 +421,7 @@ class CommentServiceTest {
 
         commentService.deleteHard(commentId, userId);
 
+        then(commentLikeRepository).should().deleteAllByCommentId(commentId);
         then(commentRepository).should().hardDeleteIfActive(commentId);
         then(commentRepository).should().delete(comment);
         then(articleCommandApi).shouldHaveNoInteractions();
@@ -437,6 +439,7 @@ class CommentServiceTest {
 
         commentService.deleteHard(commentId, userId);
 
+        then(commentLikeRepository).should().deleteAllByCommentId(commentId);
         then(commentRepository).should().hardDeleteIfActive(commentId);
         then(commentRepository).should().delete(comment);
         then(articleCommandApi).shouldHaveNoInteractions();
