@@ -23,4 +23,7 @@ public interface CommentApiDocs {
 
     @Operation(summary = "댓글 수정")
     ResponseEntity<CommentDto> update(UUID commentId, UUID userId, CommentUpdateRequest request);
+
+    @Operation(summary = "댓글 논리 삭제")
+    void delete(UUID commentId, UUID requesterUserId);
 }
