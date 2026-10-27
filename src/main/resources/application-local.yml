@@ -1,6 +1,10 @@
 # 로컬 개발: compose.yaml의 PostgreSQL·MongoDB 사용
 # bootRun 시 Docker Compose가 자동으로 컨테이너를 띄우고 접속 정보를 주입합니다.
 spring:
+  docker:
+    compose:
+      lifecycle-management: start-only
+
   jpa:
     hibernate:
       ddl-auto: update
