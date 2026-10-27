@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentLike;
 import com.sprint.monew.comment.domain.CommentOrderBy;
-import com.sprint.monew.comment.domain.CommentSearchResult;
+import com.sprint.monew.comment.domain.repository.CommentSearchResult;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;

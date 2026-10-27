@@ -1,5 +1,6 @@
-package com.sprint.monew.comment.domain;
+package com.sprint.monew.comment.domain.repository;
 
+import com.sprint.monew.comment.domain.CommentOrderBy;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
 import java.util.List;
