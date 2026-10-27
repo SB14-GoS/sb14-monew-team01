@@ -321,16 +321,33 @@ class CommentServiceTest {
         given(comment.getArticleId()).willReturn(articleId);
         given(comment.getUserId()).willReturn(userId);
         given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentRepository.softDeleteIfActive(commentId)).willReturn(1);
 
         commentService.delete(commentId, userId);
 
-        verify(comment).softDelete();
+        then(commentRepository).should().softDeleteIfActive(commentId);
         then(articleCommandApi).should().decreaseCommentCount(articleId);
         ArgumentCaptor<CommentDeletedEvent> eventCaptor = ArgumentCaptor.forClass(CommentDeletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue())
                 .extracting(CommentDeletedEvent::commentId, CommentDeletedEvent::userId)
                 .containsExactly(commentId, userId);
+    }
+
+    @Test
+    void 다른_요청이_먼저_삭제한_댓글은_카운트를_감소시키거나_삭제_이벤트를_발행하지_않는다() {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(comment.getUserId()).willReturn(userId);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentRepository.softDeleteIfActive(commentId)).willReturn(0);
+
+        commentService.delete(commentId, userId);
+
+        then(commentRepository).should().softDeleteIfActive(commentId);
+        then(articleCommandApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     @ParameterizedTest
