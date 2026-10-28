@@ -10,6 +10,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/monew}
     username: ${DB_USERNAME:monew}
     password: ${DB_PASSWORD:monew}
+    driver-class-name: org.postgresql.Driver
+
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/monew}
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,8 +22,7 @@ spring:
       hibernate:
         format_sql: true
     show-sql: true
-  mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/monew}
+
   batch:
     jdbc:
       initialize-schema: always
