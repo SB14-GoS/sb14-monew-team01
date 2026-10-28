@@ -4,14 +4,8 @@ spring:
   profiles:
     default: local
   mongodb:
-    uri: mongodb://localhost:27017/monew
     representation:
       uuid: standard # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
-  datasource:
-    url: jdbc:postgresql://localhost:5432/monew
-    username: monew
-    password: monew
-    driver-class-name: org.postgresql.Driver
 
   jpa:
     open-in-view: false
