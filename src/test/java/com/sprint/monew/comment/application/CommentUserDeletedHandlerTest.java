@@ -4,6 +4,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
 import com.sprint.monew.comment.domain.Comment;
@@ -59,5 +60,21 @@ class CommentUserDeletedHandlerTest {
         InOrder deletionOrder = inOrder(commentLikeRepository, commentRepository);
         deletionOrder.verify(commentLikeRepository).deleteAllByUserId(deletedUserId);
         deletionOrder.verify(commentRepository).deleteAllByUserId(deletedUserId);
+    }
+
+    @Test
+    @DisplayName("사용자 삭제 시 이미 소프트 삭제된 댓글은 기사 댓글 수를 낮추지 않는다")
+    void onUserDeleted_skipsSoftDeletedCommentsWhenDecreasingArticleCommentCount() {
+        UUID deletedUserId = UUID.randomUUID();
+        Comment softDeletedComment = mock(Comment.class);
+        given(softDeletedComment.isDeleted()).willReturn(true);
+        given(commentLikeRepository.findAllByUserId(deletedUserId)).willReturn(List.of());
+        given(commentRepository.findAllByUserId(deletedUserId)).willReturn(List.of(softDeletedComment));
+
+        handler.onUserDeleted(new UserDeletedEvent(deletedUserId));
+
+        verifyNoInteractions(articleCommandApi);
+        verify(commentLikeRepository).deleteAllByUserId(deletedUserId);
+        verify(commentRepository).deleteAllByUserId(deletedUserId);
     }
 }
