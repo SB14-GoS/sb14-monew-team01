@@ -8,6 +8,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -17,9 +18,15 @@ public class SubscriptionUserDeletedHandler {
     private final InterestRepository interestRepository;
 
     @EventListener
+    @Transactional
     public void onUserDeleted(UserDeletedEvent event) {
+        UUID userId = event.userId();
         List<UUID> interestIds = subscriptionRepository.findInterestIdsByUserId(event.userId());
-        subscriptionRepository.deleteAllByUserId(event.userId());
-        interestIds.forEach(interestRepository::decreaseSubscriberCount);
+        for (UUID interestId : interestIds) {
+            int deleted = subscriptionRepository.deleteByUserIdAndInterestId(userId, interestId);
+            if (deleted > 0) {
+                interestRepository.decreaseSubscriberCount(interestId);
+            }
+        }
     }
 }
