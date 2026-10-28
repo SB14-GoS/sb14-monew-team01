@@ -23,4 +23,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             @Param("notificationId") UUID notificationId, @Param("userId") UUID userId, @Param("now") Instant now);
 
     boolean existsByIdAndUserId(UUID notificationId, UUID userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Notification n where n.userId = :userId")
+    void deleteAllByUserId(@Param("userId") UUID userId);
 }
