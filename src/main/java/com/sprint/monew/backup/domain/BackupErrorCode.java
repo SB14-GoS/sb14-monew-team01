@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum BackupErrorCode implements ErrorCode {
-    EXAMPLE(null, null, null);
+    BACKUP_STORAGE_FAILED(Level.ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "백업 파일 저장소 처리에 실패했습니다."),
+    BACKUP_SERIALIZATION_FAILED(Level.ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "백업 파일 변환에 실패했습니다.");
 
     private final Level level;
     private final HttpStatus status;
