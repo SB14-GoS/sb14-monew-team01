@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.user.api.UserDeletedEvent;
+import com.sprint.monew.user.api.UserNicknameUpdatedEvent;
+import com.sprint.monew.user.api.UserRegisteredEvent;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
 import com.sprint.monew.user.domain.User;
@@ -306,6 +308,53 @@ public class UserServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.hardDelete(userId, userId)).isInstanceOf(UserNotFoundException.class);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("회원가입하면 가입 이벤트를 발행한다")
+    void registerPublishesEvent() {
+        UserRegisterRequest request = new UserRegisterRequest("woody@monew.com", "우디", "monew1!");
+        given(userRepository.existsByEmail("woody@monew.com")).willReturn(false);
+        given(passwordEncoder.encode("monew1!")).willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        UserDto result = userService.register(request);
+
+        verify(eventPublisher)
+                .publishEvent(new UserRegisteredEvent(result.id(), "woody@monew.com", "우디", result.createdAt()));
+    }
+
+    @Test
+    @DisplayName("이메일이 중복되면 가입 이벤트를 발행하지 않는다")
+    void registerWithDuplicatedEmailDoesNotPublishEvent() {
+        UserRegisterRequest request = new UserRegisterRequest("woody@monew.com", "우디", "monew1!");
+        given(userRepository.existsByEmail("woody@monew.com")).willReturn(true);
+
+        assertThatThrownBy(() -> userService.register(request)).isInstanceOf(EmailDuplicatedException.class);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("닉네임을 수정하면 닉네임 변경 이벤트를 발행한다")
+    void updateNicknamePublishesEvent() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        userService.updateNickname(userId, userId, new UserUpdateRequest("보안관우디"));
+
+        verify(eventPublisher).publishEvent(new UserNicknameUpdatedEvent(userId, "보안관우디"));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 닉네임 수정 시도는 이벤트를 발행하지 않는다")
+    void updateNicknameOfOtherUserDoesNotPublishEvent() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> userService.updateNickname(userId, otherUserId, new UserUpdateRequest("버즈")))
+                .isInstanceOf(UserUpdateForbiddenException.class);
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
