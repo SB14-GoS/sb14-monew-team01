@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.List;
 
 public interface NewsSourceClient {
-    ArticleSource getSouce();
+    ArticleSource getSource();
 
     List<RawArticle> fetch(Collection<String> keywords);
 }

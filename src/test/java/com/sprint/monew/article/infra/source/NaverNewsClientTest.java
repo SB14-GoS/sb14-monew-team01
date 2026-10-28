@@ -83,7 +83,7 @@ class NaverNewsClientTest {
     @Test
     @DisplayName("네이버 뉴스 클라이언트의 수집 출처는 NAVER다")
     void sourceIsNaver() {
-        ArticleSource result = client.getSouce();
+        ArticleSource result = client.getSource();
 
         assertThat(result).isEqualTo(ArticleSource.NAVER);
         assertThat(requests).isEmpty();

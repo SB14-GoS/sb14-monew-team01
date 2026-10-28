@@ -1,6 +1,8 @@
 # 로컬 개발: compose.yaml의 PostgreSQL·MongoDB 사용
 # bootRun 시 Docker Compose가 자동으로 컨테이너를 띄우고 접속 정보를 주입합니다.
 spring:
+  config:
+    import: "optional:file:./.env[.properties]"
   docker:
     compose:
       lifecycle-management: start-only   # 앱 종료 시 컨테이너는 유지
@@ -24,3 +26,8 @@ spring:
 logging:
   level:
     com.sprint.monew: debug
+
+news:
+  naver:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
