@@ -1,15 +1,15 @@
 # 운영(AWS): 모든 접속 정보는 환경 변수로 주입
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/monew
+    username: ${RDS_USERNAME}
+    password: ${RDS_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
 
   mongodb:
-    uri: ${MONGODB_URI}
+    uri: ${MONGO_URI}
 
   batch:
     jdbc:

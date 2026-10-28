@@ -4,23 +4,20 @@ spring:
   profiles:
     default: local
   mongodb:
-    uri: ${MONGO_URI:mongodb://localhost:27017/monew}
+    uri: mongodb://localhost:27017/monew
     representation:
       uuid: standard # Boot 4 기본값(unspecified)이면 UUID를 저장할 수 없다
   datasource:
-    url: jdbc:postgresql://${RDS_ENDPOINT:localhost}:5432/monew
-    username: ${RDS_USERNAME:monew}
-    password: ${RDS_PASSWORD:monew}
+    url: jdbc:postgresql://localhost:5432/monew
+    username: monew
+    password: monew
     driver-class-name: org.postgresql.Driver
 
   jpa:
     open-in-view: false
-    hibernate:
-      ddl-auto: update
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        format_sql: true
 
   batch:
     job:
@@ -38,7 +35,6 @@ management:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"
-  level:
-    org.hibernate.SQL: debug
+
 springdoc:
   paths-to-match: /api/**
