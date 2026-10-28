@@ -15,6 +15,7 @@ import com.sprint.monew.comment.application.CommentLikeService;
 import com.sprint.monew.comment.application.CommentService;
 import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
 import com.sprint.monew.comment.domain.exception.CommentLikeAlreadyExistsException;
+import com.sprint.monew.comment.domain.exception.CommentLikeNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.web.dto.CommentDto;
@@ -424,6 +425,44 @@ class CommentControllerTest {
                 .andExpect(status().isConflict());
 
         verify(commentLikeService).like(commentId, requesterUserId);
+    }
+
+    @Test
+    @DisplayName("댓글 좋아요 취소 요청은 204를 반환한다")
+    void unlike() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", requesterUserId))
+                .andExpect(status().isNoContent());
+
+        verify(commentLikeService).unlike(commentId, requesterUserId);
+    }
+
+    @Test
+    @DisplayName("좋아요 취소 요청에 사용자 ID 헤더가 없으면 400을 반환한다")
+    void rejectsMissingUnlikeRequesterId() throws Exception {
+        mockMvc.perform(delete("/api/comments/{commentId}/comment-likes", UUID.randomUUID()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentLikeService);
+    }
+
+    @Test
+    @DisplayName("좋아요하지 않은 댓글을 취소 요청하면 409를 반환한다")
+    void unlikeNotFound() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        willThrow(new CommentLikeNotFoundException(commentId, requesterUserId))
+                .given(commentLikeService)
+                .unlike(commentId, requesterUserId);
+
+        mockMvc.perform(delete("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", requesterUserId))
+                .andExpect(status().isConflict());
+
+        verify(commentLikeService).unlike(commentId, requesterUserId);
     }
 
     private static Stream<String> missingArticleIdRequests() {
