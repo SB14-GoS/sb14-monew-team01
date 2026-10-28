@@ -1,7 +1,9 @@
 package com.sprint.monew.user.application;
 
 import com.sprint.monew.user.api.UserDeletedEvent;
+import com.sprint.monew.user.api.UserNicknameUpdatedEvent;
 import com.sprint.monew.user.api.UserQueryApi;
+import com.sprint.monew.user.api.UserRegisteredEvent;
 import com.sprint.monew.user.api.UserSummary;
 import com.sprint.monew.user.domain.EmailDuplicatedException;
 import com.sprint.monew.user.domain.LoginFailedException;
@@ -52,6 +54,8 @@ public class UserService implements UserQueryApi {
         String encodedPassword = passwordEncoder.encode(request.password());
         try {
             User user = userRepository.saveAndFlush(new User(request.email(), request.nickname(), encodedPassword));
+            eventPublisher.publishEvent(
+                    new UserRegisteredEvent(user.getId(), user.getEmail(), user.getNickname(), user.getCreatedAt()));
             return UserDto.from(user);
         } catch (DataIntegrityViolationException e) {
             if (isEmailUniqueViolation(e)) {
@@ -81,6 +85,7 @@ public class UserService implements UserQueryApi {
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(() -> new UserNotFoundException(userId));
         user.updateNickname(request.nickname());
+        eventPublisher.publishEvent(new UserNicknameUpdatedEvent(userId, user.getNickname()));
         return UserDto.from(user);
     }
 
