@@ -6,12 +6,16 @@ import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.exception.InvalidNaverNewsResponseException;
 import com.sprint.monew.article.infra.source.dto.NaverNewsItem;
 import com.sprint.monew.article.infra.source.dto.NaverNewsResponse;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.HtmlUtils;
@@ -28,11 +32,22 @@ public class NaverNewsClient implements NewsSourceClient {
             @Value("${news.naver.client-secret}") String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        // 네이버는 JSON 본문을 text/plain으로 응답하기도 한다.
+        JacksonJsonHttpMessageConverter jsonConverter = new JacksonJsonHttpMessageConverter();
+        List<MediaType> supportedMediaTypes = new ArrayList<>(jsonConverter.getSupportedMediaTypes());
+        supportedMediaTypes.add(MediaType.TEXT_PLAIN);
+        jsonConverter.setSupportedMediaTypes(supportedMediaTypes);
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+        requestFactory.setReadTimeout(Duration.ofSeconds(10));
+
         /* 요청 보낼 클라이언트 생성 */
         this.restClient = RestClient.builder()
                 .baseUrl("https://naverapihub.apigw.ntruss.com")
                 .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                 .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
+                .configureMessageConverters(converters -> converters.withJsonConverter(jsonConverter))
                 .build();
     }
 
@@ -47,7 +62,7 @@ public class NaverNewsClient implements NewsSourceClient {
         for (String keyword : keywords) {
             NaverNewsResponse response = restClient
                     .get()
-                    .uri("/search/v1/news?query={keyword}&display=2&sort=date&format=json", keyword)
+                    .uri("/search/v1/news?query={keyword}&display=100" + "&sort=date&format=json", keyword)
                     .retrieve()
                     .body(NaverNewsResponse.class);
 
