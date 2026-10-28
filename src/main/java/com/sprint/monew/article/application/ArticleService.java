@@ -225,11 +225,11 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     @Override
     public void decreaseCommentCount(UUID articleId) {
         Article article = articleRepository
-                .findWithLockByIdAndDeletedAtIsNull(articleId)
+                .findWithLockById(articleId)
                 .orElseThrow(() -> new ArticleNotFoundException(articleId));
         if (article.getCommentCount() > 0) {
             int updated = articleRepository.decreaseCommentCount(articleId);
-            if (updated == 0 && !articleRepository.existsByIdAndDeletedAtIsNull(articleId)) {
+            if (updated == 0 && !articleRepository.existsById(articleId)) {
                 throw new ArticleNotFoundException(articleId);
             }
         }
