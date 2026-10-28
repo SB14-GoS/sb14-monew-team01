@@ -87,4 +87,11 @@ public class CommentController implements CommentApiDocs {
         CommentLikeDto createdLike = commentLikeService.like(commentId, requesterUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdLike);
     }
+
+    @DeleteMapping("/{commentId}/comment-likes")
+    @Override
+    public ResponseEntity<Void> unlike(@PathVariable UUID commentId, @RequestUserId UUID requestUserId) {
+        commentLikeService.unlike(commentId, requestUserId);
+        return ResponseEntity.noContent().build();
+    }
 }

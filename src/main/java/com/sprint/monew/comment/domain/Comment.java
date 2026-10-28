@@ -71,4 +71,8 @@ public class Comment extends BaseSoftDeleteEntity {
     public void increaseLikeCount() {
         likeCount++;
     }
+
+    public void decreaseLikeCount() {
+        likeCount--;
+    }
 }
