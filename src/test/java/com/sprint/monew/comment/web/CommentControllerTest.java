@@ -11,11 +11,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sprint.monew.comment.application.CommentLikeService;
 import com.sprint.monew.comment.application.CommentService;
 import com.sprint.monew.comment.domain.exception.CommentAccessDeniedException;
+import com.sprint.monew.comment.domain.exception.CommentLikeAlreadyExistsException;
 import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.web.dto.CommentDto;
+import com.sprint.monew.comment.web.dto.CommentLikeDto;
 import com.sprint.monew.global.common.CursorPageResponse;
 import com.sprint.monew.global.common.CursorRequest;
 import com.sprint.monew.global.common.SortDirection;
@@ -42,6 +45,9 @@ class CommentControllerTest {
 
     @MockitoBean
     private CommentService commentService;
+
+    @MockitoBean
+    private CommentLikeService commentLikeService;
 
     @ParameterizedTest
     @ValueSource(strings = {"", "/hard"})
@@ -362,6 +368,62 @@ class CommentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"수정한 댓글\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("댓글 좋아요 요청은 201과 좋아요 응답을 반환한다")
+    void like() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        UUID commentUserId = UUID.randomUUID();
+        CommentLikeDto response = new CommentLikeDto(
+                UUID.randomUUID(),
+                requesterUserId,
+                Instant.parse("2026-10-28T01:00:00Z"),
+                commentId,
+                articleId,
+                commentUserId,
+                "댓글 작성자",
+                "댓글 내용",
+                1L,
+                Instant.parse("2026-10-27T01:00:00Z"));
+        given(commentLikeService.like(commentId, requesterUserId)).willReturn(response);
+
+        mockMvc.perform(post("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", requesterUserId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.likedBy").value(requesterUserId.toString()))
+                .andExpect(jsonPath("$.commentId").value(commentId.toString()))
+                .andExpect(jsonPath("$.commentUserNickname").value("댓글 작성자"))
+                .andExpect(jsonPath("$.commentLikeCount").value(1));
+
+        verify(commentLikeService).like(commentId, requesterUserId);
+    }
+
+    @Test
+    @DisplayName("좋아요 요청에 사용자 ID 헤더가 없으면 400을 반환한다")
+    void rejectsMissingLikeRequesterId() throws Exception {
+        mockMvc.perform(post("/api/comments/{commentId}/comment-likes", UUID.randomUUID()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(commentLikeService);
+    }
+
+    @Test
+    @DisplayName("이미 좋아요한 댓글에 다시 좋아요를 요청하면 409를 반환한다")
+    void likeAlreadyExists() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        willThrow(new CommentLikeAlreadyExistsException(commentId, requesterUserId))
+                .given(commentLikeService)
+                .like(commentId, requesterUserId);
+
+        mockMvc.perform(post("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", requesterUserId))
+                .andExpect(status().isConflict());
+
+        verify(commentLikeService).like(commentId, requesterUserId);
     }
 
     private static Stream<String> missingArticleIdRequests() {

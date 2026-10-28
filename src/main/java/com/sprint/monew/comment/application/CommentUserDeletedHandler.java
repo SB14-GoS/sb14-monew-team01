@@ -21,6 +21,7 @@ public class CommentUserDeletedHandler {
 
     @EventListener
     @Transactional
+    /* 유저 물리삭제 후 연관 관계 정리*/
     public void onUserDeleted(UserDeletedEvent event) {
         UUID userId = event.userId();
 
