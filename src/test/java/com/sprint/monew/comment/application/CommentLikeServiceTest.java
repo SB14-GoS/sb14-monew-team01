@@ -9,11 +9,13 @@ import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.comment.api.CommentLikedEvent;
+import com.sprint.monew.comment.api.CommentUnlikedEvent;
 import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.CommentLike;
 import com.sprint.monew.comment.domain.CommentLikeRepository;
 import com.sprint.monew.comment.domain.CommentRepository;
 import com.sprint.monew.comment.domain.exception.CommentLikeAlreadyExistsException;
+import com.sprint.monew.comment.domain.exception.CommentLikeNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.web.dto.CommentLikeDto;
@@ -148,6 +150,80 @@ class CommentLikeServiceTest {
                 .isInstanceOf(CommentLikeAlreadyExistsException.class);
 
         then(articleQueryApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 댓글_좋아요를_취소하면_좋아요_수를_감소시키고_이벤트를_발행한다() {
+        UUID commentId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        UUID commentUserId = UUID.randomUUID();
+        Comment comment = new Comment(articleId, commentUserId, "댓글 내용");
+        ReflectionTestUtils.setField(comment, "id", commentId);
+        ReflectionTestUtils.setField(comment, "likeCount", 1L);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(userQueryApi.exists(requesterUserId)).willReturn(true);
+        given(commentLikeRepository.deleteByCommentIdAndUserId(commentId, requesterUserId))
+                .willReturn(1);
+
+        commentLikeService.unlike(commentId, requesterUserId);
+
+        then(commentLikeRepository).should().deleteByCommentIdAndUserId(commentId, requesterUserId);
+        assertThat(comment.getLikeCount()).isZero();
+        ArgumentCaptor<CommentUnlikedEvent> eventCaptor = ArgumentCaptor.forClass(CommentUnlikedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue())
+                .extracting(
+                        CommentUnlikedEvent::commentId,
+                        CommentUnlikedEvent::likerId,
+                        CommentUnlikedEvent::commentUserId,
+                        CommentUnlikedEvent::commentLikeCount)
+                .containsExactly(commentId, requesterUserId, commentUserId, 0L);
+    }
+
+    @Test
+    void 존재하지_않는_댓글의_좋아요는_취소할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        given(commentRepository.findById(commentId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commentLikeService.unlike(commentId, UUID.randomUUID()))
+                .isInstanceOf(CommentNotFoundException.class);
+
+        then(userQueryApi).shouldHaveNoInteractions();
+        then(commentLikeRepository).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 존재하지_않는_사용자는_좋아요를_취소할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        given(commentRepository.findById(commentId))
+                .willReturn(Optional.of(new Comment(UUID.randomUUID(), UUID.randomUUID(), "댓글 내용")));
+        given(userQueryApi.exists(requesterUserId)).willReturn(false);
+
+        assertThatThrownBy(() -> commentLikeService.unlike(commentId, requesterUserId))
+                .isInstanceOf(CommentUserNotFoundException.class);
+
+        then(commentLikeRepository).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 좋아요하지_않은_댓글의_좋아요는_취소할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        Comment comment = new Comment(UUID.randomUUID(), UUID.randomUUID(), "댓글 내용");
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(userQueryApi.exists(requesterUserId)).willReturn(true);
+        given(commentLikeRepository.deleteByCommentIdAndUserId(commentId, requesterUserId))
+                .willReturn(0);
+
+        assertThatThrownBy(() -> commentLikeService.unlike(commentId, requesterUserId))
+                .isInstanceOf(CommentLikeNotFoundException.class);
+
+        assertThat(comment.getLikeCount()).isZero();
         then(eventPublisher).shouldHaveNoInteractions();
     }
 }
