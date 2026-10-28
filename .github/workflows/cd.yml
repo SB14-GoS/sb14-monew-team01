@@ -3,7 +3,7 @@ name: CD - Deploy to AWS ECS
 on:
   push:
     branches:
-      - main  # 요구사항: main 브랜치에 병합(push)될 때 자동 실행
+      - 'infra/#49-cd-ecs'  # 요구사항: main 브랜치에 병합(push)될 때 자동 실행
   workflow_dispatch: # 필요 시 GitHub 웹에서 수동으로도 실행 테스트 가능하도록 추가
 
 env:
