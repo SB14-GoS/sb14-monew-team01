@@ -97,7 +97,7 @@ class NaverNewsClientTest {
         assertThat(requests).singleElement().satisfies(request -> {
             assertThat(request.method()).isEqualTo("GET");
             assertThat(URLDecoder.decode(request.rawQuery(), StandardCharsets.UTF_8))
-                    .isEqualTo("query=북한&display=2&sort=date&format=json");
+                    .isEqualTo("query=북한&display=100&sort=date&format=json");
             assertThat(request.clientId()).isEqualTo("test-id");
             assertThat(request.clientSecret()).isEqualTo("test-secret");
         });
