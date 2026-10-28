@@ -33,4 +33,7 @@ public interface CommentApiDocs {
 
     @Operation(summary = "좋아요 생성")
     ResponseEntity<CommentLikeDto> like(UUID commentId, UUID requesterUserId);
+
+    @Operation(summary = "좋아요 취소")
+    ResponseEntity<Void> unlike(UUID commentId, UUID requesterUserId);
 }
