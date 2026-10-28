@@ -13,9 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface ArticleRepository extends JpaRepository<Article, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<Article> findWithLockByIdAndDeletedAtIsNull(UUID articleId);
-
-    boolean existsByIdAndDeletedAtIsNull(UUID articleId);
+    Optional<Article> findWithLockById(UUID articleId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Article a set a.viewCount = a.viewCount + 1 where a.id = :articleId")
@@ -28,6 +26,6 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Article a set a.commentCount = a.commentCount - 1 "
-            + "where a.id = :articleId and a.deletedAt is null and a.commentCount > 0")
+            + "where a.id = :articleId and a.commentCount > 0")
     int decreaseCommentCount(@Param("articleId") UUID articleId);
 }
