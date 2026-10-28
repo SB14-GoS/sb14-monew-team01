@@ -16,3 +16,8 @@ spring:
 logging:
   level:
     root: info
+
+news:
+  naver:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}

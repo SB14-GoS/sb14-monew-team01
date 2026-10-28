@@ -44,6 +44,7 @@ public class NaverNewsClient implements NewsSourceClient {
 
         /* 요청 보낼 클라이언트 생성 */
         this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl("https://naverapihub.apigw.ntruss.com")
                 .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                 .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
@@ -52,7 +53,7 @@ public class NaverNewsClient implements NewsSourceClient {
     }
 
     @Override
-    public ArticleSource getSouce() {
+    public ArticleSource getSource() {
         return ArticleSource.NAVER;
     }
 
