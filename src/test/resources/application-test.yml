@@ -9,3 +9,8 @@ spring:
   docker:
     compose:
       enabled: false
+
+news:
+  naver:
+    client-id: test-client-id
+    client-secret: test-client-secret
