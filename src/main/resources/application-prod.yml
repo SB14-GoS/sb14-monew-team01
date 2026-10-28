@@ -1,7 +1,7 @@
 # 운영(AWS): 모든 접속 정보는 환경 변수로 주입
 spring:
   datasource:
-    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/monew
+    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/monew?sslmode=require
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
   jpa:
