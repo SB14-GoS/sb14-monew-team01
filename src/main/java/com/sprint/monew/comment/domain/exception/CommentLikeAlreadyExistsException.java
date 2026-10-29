@@ -10,4 +10,9 @@ public class CommentLikeAlreadyExistsException extends CommentException {
     public CommentLikeAlreadyExistsException(UUID commentId, UUID userId) {
         super(CommentErrorCode.COMMENT_LIKE_ALREADY_EXISTS, Map.of("commentId", commentId, "userId", userId));
     }
+
+    public CommentLikeAlreadyExistsException(UUID commentId, UUID userId, Throwable cause) {
+        this(commentId, userId);
+        initCause(cause);
+    }
 }

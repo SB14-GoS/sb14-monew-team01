@@ -42,11 +42,13 @@ class CommentUserDeletedHandlerTest {
     void onUserDeleted() {
         UUID deletedUserId = UUID.randomUUID();
         UUID articleId = UUID.randomUUID();
+        UUID likedCommentId = UUID.randomUUID();
         CommentLike commentLike = mock(CommentLike.class);
         Comment likedComment = mock(Comment.class);
         Comment writtenComment = mock(Comment.class);
 
         given(commentLike.getComment()).willReturn(likedComment);
+        given(likedComment.getId()).willReturn(likedCommentId);
         given(writtenComment.isDeleted()).willReturn(false);
         given(writtenComment.getArticleId()).willReturn(articleId);
         given(commentLikeRepository.findAllByUserId(deletedUserId)).willReturn(List.of(commentLike));
@@ -54,7 +56,7 @@ class CommentUserDeletedHandlerTest {
 
         handler.onUserDeleted(new UserDeletedEvent(deletedUserId));
 
-        verify(likedComment).decreaseLikeCount();
+        verify(commentRepository).decreaseLikeCount(likedCommentId);
         verify(articleCommandApi).decreaseCommentCount(articleId);
 
         InOrder deletionOrder = inOrder(commentLikeRepository, commentRepository);
