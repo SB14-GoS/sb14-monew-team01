@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -34,6 +33,7 @@ class NaverNewsClientTest {
     private final List<Request> requests = new CopyOnWriteArrayList<>();
     private volatile int status = 200;
     private volatile String body;
+    private volatile String contentType = "application/json;charset=UTF-8";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -49,7 +49,7 @@ class NaverNewsClientTest {
                     exchange.getRequestHeaders().getFirst("X-NCP-APIGW-API-KEY-ID"),
                     exchange.getRequestHeaders().getFirst("X-NCP-APIGW-API-KEY")));
 
-            exchange.getResponseHeaders().set("Content-Type", "application/json;charset=UTF-8");
+            exchange.getResponseHeaders().set("Content-Type", contentType);
             if (status == 204) {
                 exchange.sendResponseHeaders(204, -1);
             } else {
@@ -72,12 +72,9 @@ class NaverNewsClientTest {
     }
 
     private NaverNewsClient clientPointingTo(String baseUrl) {
-        NaverNewsClient newsClient = new NaverNewsClient("test-id", "test-secret");
-        RestClient original = (RestClient) ReflectionTestUtils.getField(newsClient, "restClient");
-        // 운영 생성자의 인증 헤더·JSON 변환 설정은 유지하고 테스트에서 요청 주소만 바꾼다.
-        ReflectionTestUtils.setField(
-                newsClient, "restClient", original.mutate().baseUrl(baseUrl).build());
-        return newsClient;
+        RestClient original = new NaverNewsClientConfig().naverRestClient("test-id", "test-secret");
+        // 운영 설정의 인증 헤더·JSON 변환·타임아웃은 유지하고 요청 주소만 바꾼다.
+        return new NaverNewsClient(original.mutate().baseUrl(baseUrl).build());
     }
 
     @Test
@@ -130,6 +127,14 @@ class NaverNewsClientTest {
                                 "두 번째 기사",
                                 Instant.parse("2026-10-27T15:30:00Z"),
                                 "두 번째 요약"));
+    }
+
+    @Test
+    @DisplayName("설정 분리 후에도 text/plain으로 전달된 JSON 응답을 읽는다")
+    void readsJsonServedAsTextPlain() {
+        contentType = "text/plain;charset=UTF-8";
+
+        assertThat(client.fetch(List.of("북한"))).hasSize(2);
     }
 
     @Test
