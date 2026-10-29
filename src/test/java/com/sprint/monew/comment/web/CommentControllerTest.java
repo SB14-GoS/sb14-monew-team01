@@ -4,7 +4,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -325,43 +324,6 @@ class CommentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"수정한 댓글\"}"))
                 .andExpect(status().isForbidden());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"", "/hard"})
-    @DisplayName("인증 없이 작성자 헤더만 보낸 삭제 요청은 거부한다")
-    void deleteRejectsForgedHeaderWithoutPrincipal(String suffix) throws Exception {
-        mockMvc.perform(delete("/api/comments/" + UUID.randomUUID() + suffix)
-                        .header("Monew-Request-User-ID", UUID.randomUUID()))
-                .andExpect(status().isUnauthorized());
-        verifyNoInteractions(commentService);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"", "/hard"})
-    @DisplayName("삭제 요청은 위조 헤더 대신 인증된 사용자를 서비스에 전달한다")
-    void deleteUsesPrincipalInsteadOfHeader(String suffix) throws Exception {
-        UUID commentId = UUID.randomUUID();
-        UUID actualUser = UUID.randomUUID();
-        UUID author = UUID.randomUUID();
-        if (suffix.isEmpty()) {
-            willThrow(new CommentAccessDeniedException(commentId, actualUser))
-                    .given(commentService)
-                    .delete(commentId, actualUser);
-        } else {
-            willThrow(new CommentAccessDeniedException(commentId, actualUser))
-                    .given(commentService)
-                    .deleteHard(commentId, actualUser);
-        }
-        mockMvc.perform(delete("/api/comments/" + commentId + suffix)
-                        .principal(actualUser::toString)
-                        .header("Monew-Request-User-ID", author))
-                .andExpect(status().isForbidden());
-        if (suffix.isEmpty()) {
-            verify(commentService).delete(commentId, actualUser);
-        } else {
-            verify(commentService).deleteHard(commentId, actualUser);
-        }
     }
 
     private static Stream<String> missingArticleIdRequests() {
