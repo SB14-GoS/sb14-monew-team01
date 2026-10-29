@@ -38,6 +38,10 @@ public class CommentLikeService {
         Comment comment =
                 commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
 
+        if (comment.isDeleted()) {
+            throw new CommentNotFoundException(commentId);
+        }
+
         if (!userQueryApi.exists(requesterUserId)) {
             throw new CommentUserNotFoundException(requesterUserId);
         }
@@ -78,6 +82,9 @@ public class CommentLikeService {
 
         Comment comment =
                 commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
+        if (comment.isDeleted()) {
+            throw new CommentNotFoundException(commentId);
+        }
 
         if (!userQueryApi.exists(requesterUserId)) {
             throw new CommentUserNotFoundException(requesterUserId);

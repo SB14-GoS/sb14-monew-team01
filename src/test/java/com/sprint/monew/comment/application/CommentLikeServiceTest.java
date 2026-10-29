@@ -128,6 +128,39 @@ class CommentLikeServiceTest {
     }
 
     @Test
+    void 논리_삭제된_댓글에는_좋아요를_등록할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        Comment comment = new Comment(UUID.randomUUID(), UUID.randomUUID(), "댓글 내용");
+        comment.softDelete();
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> commentLikeService.like(commentId, UUID.randomUUID()))
+                .isInstanceOf(CommentNotFoundException.class);
+
+        then(commentRepository).should(org.mockito.Mockito.never()).increaseLikeCount(commentId);
+        then(commentLikeRepository).shouldHaveNoInteractions();
+        then(userQueryApi).shouldHaveNoInteractions();
+        then(articleQueryApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 논리_삭제된_댓글의_좋아요는_취소할_수_없다() {
+        UUID commentId = UUID.randomUUID();
+        Comment comment = new Comment(UUID.randomUUID(), UUID.randomUUID(), "댓글 내용");
+        comment.softDelete();
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+
+        assertThatThrownBy(() -> commentLikeService.unlike(commentId, UUID.randomUUID()))
+                .isInstanceOf(CommentNotFoundException.class);
+
+        then(commentRepository).should(org.mockito.Mockito.never()).decreaseLikeCount(commentId);
+        then(commentLikeRepository).shouldHaveNoInteractions();
+        then(userQueryApi).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
     void 존재하지_않는_사용자는_좋아요를_등록할_수_없다() {
         UUID commentId = UUID.randomUUID();
         UUID requesterUserId = UUID.randomUUID();

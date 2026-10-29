@@ -450,7 +450,7 @@ class CommentControllerTest {
     }
 
     @Test
-    @DisplayName("좋아요하지 않은 댓글을 취소 요청하면 409를 반환한다")
+    @DisplayName("좋아요하지 않은 댓글을 취소 요청하면 404를 반환한다")
     void unlikeNotFound() throws Exception {
         UUID commentId = UUID.randomUUID();
         UUID requesterUserId = UUID.randomUUID();
@@ -460,7 +460,7 @@ class CommentControllerTest {
 
         mockMvc.perform(delete("/api/comments/{commentId}/comment-likes", commentId)
                         .header("Monew-Request-User-ID", requesterUserId))
-                .andExpect(status().isConflict());
+                .andExpect(status().isNotFound());
 
         verify(commentLikeService).unlike(commentId, requesterUserId);
     }
