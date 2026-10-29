@@ -4,6 +4,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,6 +42,43 @@ class CommentControllerTest {
 
     @MockitoBean
     private CommentService commentService;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/hard"})
+    @DisplayName("댓글 삭제 성공 시 204를 반환한다")
+    void deleteReturnsNoContent(String suffix) throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/comments/{commentId}" + suffix, commentId).header("Monew-Request-User-ID", userId))
+                .andExpect(status().isNoContent());
+
+        if (suffix.isEmpty()) {
+            verify(commentService).delete(commentId, userId);
+        } else {
+            verify(commentService).deleteHard(commentId, userId);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/hard"})
+    @DisplayName("존재하지 않는 댓글 삭제 시 404를 반환한다")
+    void deleteNotFound(String suffix) throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        if (suffix.isEmpty()) {
+            willThrow(new CommentNotFoundException(commentId))
+                    .given(commentService)
+                    .delete(commentId, userId);
+        } else {
+            willThrow(new CommentNotFoundException(commentId))
+                    .given(commentService)
+                    .deleteHard(commentId, userId);
+        }
+
+        mockMvc.perform(delete("/api/comments/{commentId}" + suffix, commentId).header("Monew-Request-User-ID", userId))
+                .andExpect(status().isNotFound());
+    }
 
     @Test
     void 정상_댓글_등록은_201과_댓글_응답을_반환한다() throws Exception {
