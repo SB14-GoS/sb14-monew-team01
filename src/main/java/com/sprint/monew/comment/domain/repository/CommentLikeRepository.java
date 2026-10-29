@@ -27,4 +27,9 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM CommentLike cl WHERE cl.comment.id = :commentId")
     int deleteAllByCommentId(@Param("commentId") UUID commentId);
+
+    /** 댓글 ID 목록에 해당하는 모든 좋아요를 물리 삭제한다. */
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM CommentLike cl WHERE cl.comment.id IN :commentIds")
+    int deleteAllByCommentIdIn(@Param("commentIds") List<UUID> commentIds);
 }
