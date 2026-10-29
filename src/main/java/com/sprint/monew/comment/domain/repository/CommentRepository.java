@@ -12,6 +12,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, UUID>, CommentQueryRepository {
 
+    List<Comment> findAllByUserId(UUID userId);
+
+    void deleteAllByUserId(UUID userId);
+
     /** 기사에 속한 모든 댓글을 물리 삭제한다. */
     void deleteAllByArticleId(UUID articleId);
 

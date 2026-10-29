@@ -1,6 +1,7 @@
 package com.sprint.monew.comment.domain.repository;
 
 import com.sprint.monew.comment.domain.CommentLike;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -8,6 +9,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> {
+
+    List<CommentLike> findAllByUserId(UUID userId);
+
+    void deleteAllByUserId(UUID userId);
+
+    @Modifying
+    @Query("DELETE FROM CommentLike cl WHERE cl.comment.id = :commentId AND cl.userId = :userId")
+    int deleteByCommentIdAndUserId(@Param("commentId") UUID commentId, @Param("userId") UUID userId);
 
     /** 사용자가 해당 댓글에 좋아요를 눌렀는지 확인한다. */
     boolean existsByComment_IdAndUserId(UUID commentId, UUID userId);
