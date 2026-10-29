@@ -16,7 +16,9 @@ import com.sprint.monew.user.api.UserQueryApi;
 import com.sprint.monew.user.api.UserSummary;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,10 +50,22 @@ public class CommentLikeService {
         UserSummary requester = userQueryApi.getSummary(requesterUserId);
         UserSummary commentUser = userQueryApi.getSummary(comment.getUserId());
 
-        CommentLike savedLike =
-                commentLikeRepository.save(new CommentLike(comment, requesterUserId, comment.getArticleId()));
+        commentRepository.increaseLikeCount(commentId);
 
-        comment.increaseLikeCount();
+        // 좋아요수 증가후 다시 재조회
+        Comment updatedComment =
+                commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
+
+        CommentLike savedLike;
+        try {
+            savedLike = commentLikeRepository.saveAndFlush(
+                    new CommentLike(updatedComment, requesterUserId, updatedComment.getArticleId()));
+        } catch (DataIntegrityViolationException e) {
+            if (isCommentLikeUniqueViolation(e)) {
+                throw new CommentLikeAlreadyExistsException(commentId, requesterUserId, e);
+            }
+            throw e;
+        }
 
         eventPublisher.publishEvent(
                 toLikedEvent(savedLike, requester, commentUser, articleQueryApi.getTitle(comment.getArticleId())));
@@ -75,10 +89,13 @@ public class CommentLikeService {
             throw new CommentLikeNotFoundException(commentId, requesterUserId);
         }
 
-        comment.decreaseLikeCount();
+        commentRepository.decreaseLikeCount(commentId);
+
+        Comment updateComment =
+                commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
 
         eventPublisher.publishEvent(
-                toUnlikedEvent(commentId, requesterUserId, comment.getUserId(), comment.getLikeCount()));
+                toUnlikedEvent(commentId, requesterUserId, updateComment.getUserId(), updateComment.getLikeCount()));
     }
 
     private CommentLikedEvent toLikedEvent(
@@ -103,5 +120,15 @@ public class CommentLikeService {
     private CommentUnlikedEvent toUnlikedEvent(
             UUID commentId, UUID likerId, UUID commentUserId, long commentLikeCount) {
         return new CommentUnlikedEvent(commentId, likerId, commentUserId, commentLikeCount);
+    }
+
+    private boolean isCommentLikeUniqueViolation(DataIntegrityViolationException exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation
+                    && "uk_comment_like_comment_user".equalsIgnoreCase(violation.getConstraintName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

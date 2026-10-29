@@ -38,4 +38,16 @@ public interface CommentRepository extends JpaRepository<Comment, UUID>, Comment
       AND c.deletedAt IS NULL
     """)
     int hardDeleteIfActive(@Param("commentId") UUID commentId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Comment c SET c.likeCount = c.likeCount + 1 WHERE c.id = :commentId")
+    int increaseLikeCount(@Param("commentId") UUID commentId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+    UPDATE Comment c
+    SET c.likeCount = CASE WHEN c.likeCount > 0 THEN c.likeCount - 1 ELSE 0 END
+    WHERE c.id = :commentId
+    """)
+    int decreaseLikeCount(@Param("commentId") UUID commentId);
 }

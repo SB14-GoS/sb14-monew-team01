@@ -5,6 +5,7 @@ import com.sprint.monew.comment.domain.Comment;
 import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
 import com.sprint.monew.comment.domain.repository.CommentRepository;
 import com.sprint.monew.user.api.UserDeletedEvent;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -25,9 +26,12 @@ public class CommentUserDeletedHandler {
     public void onUserDeleted(UserDeletedEvent event) {
         UUID userId = event.userId();
 
-        commentLikeRepository.findAllByUserId(userId).stream()
-                .map(commentLike -> commentLike.getComment())
-                .forEach(Comment::decreaseLikeCount);
+        List<UUID> likedCommentIds = commentLikeRepository.findAllByUserId(userId).stream()
+                .map(commentLike -> commentLike.getComment().getId())
+                .toList();
+
+        likedCommentIds.forEach(commentRepository::decreaseLikeCount);
+
         commentLikeRepository.deleteAllByUserId(userId);
 
         commentRepository.findAllByUserId(userId).stream()
