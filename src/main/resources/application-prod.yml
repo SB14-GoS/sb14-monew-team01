@@ -21,5 +21,5 @@ logging:
 
 news:
   naver:
-    client-id: ${NAVER_CLIENT_ID:}
-    client-secret: ${NAVER_CLIENT_SECRET:}
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
