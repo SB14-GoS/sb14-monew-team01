@@ -6,51 +6,19 @@ import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.exception.InvalidNaverNewsResponseException;
 import com.sprint.monew.article.infra.source.dto.NaverNewsItem;
 import com.sprint.monew.article.infra.source.dto.NaverNewsResponse;
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
-import org.springframework.stereotype.Component;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.HtmlUtils;
 
-@Component
+@RequiredArgsConstructor
 public class NaverNewsClient implements NewsSourceClient {
 
-    private final String clientId;
-    private final String clientSecret;
     private final RestClient restClient;
-
-    public NaverNewsClient(
-            @Value("${news.naver.client-id}") String clientId,
-            @Value("${news.naver.client-secret}") String clientSecret) {
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-        // 네이버는 JSON 본문을 text/plain으로 응답하기도 한다.
-        JacksonJsonHttpMessageConverter jsonConverter = new JacksonJsonHttpMessageConverter();
-        List<MediaType> supportedMediaTypes = new ArrayList<>(jsonConverter.getSupportedMediaTypes());
-        supportedMediaTypes.add(MediaType.TEXT_PLAIN);
-        jsonConverter.setSupportedMediaTypes(supportedMediaTypes);
-
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(3));
-        requestFactory.setReadTimeout(Duration.ofSeconds(10));
-
-        /* 요청 보낼 클라이언트 생성 */
-        this.restClient = RestClient.builder()
-                .requestFactory(requestFactory)
-                .baseUrl("https://naverapihub.apigw.ntruss.com")
-                .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
-                .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
-                .configureMessageConverters(converters -> converters.withJsonConverter(jsonConverter))
-                .build();
-    }
 
     @Override
     public ArticleSource getSource() {
