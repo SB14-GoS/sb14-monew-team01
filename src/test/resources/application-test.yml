@@ -19,3 +19,10 @@ news:
   naver:
     client-id: test-client-id
     client-secret: test-client-secret
+
+monew:
+  storage:
+    s3:
+      region: ap-northeast-2
+      backup-bucket: test-backup-bucket
+      log-bucket: test-log-bucket

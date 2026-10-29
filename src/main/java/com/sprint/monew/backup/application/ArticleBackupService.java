@@ -37,7 +37,7 @@ public class ArticleBackupService {
         try {
             return jsonMapper.writeValueAsBytes(records);
         } catch (JacksonException exception) {
-            throw new BackupSerializationFailedException();
+            throw new BackupSerializationFailedException(exception);
         }
     }
 }

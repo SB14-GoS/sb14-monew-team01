@@ -23,10 +23,11 @@ public class S3FileStorage implements FileStorage {
     public void put(String key, byte[] content) {
         try {
             s3Client.putObject(
-                    request -> request.bucket(properties.bucket()).key(key).contentType("application/json"),
+                    request ->
+                            request.bucket(properties.backupBucket()).key(key).contentType("application/json"),
                     RequestBody.fromBytes(content));
         } catch (SdkException exception) {
-            throw new BackupStorageFailedException(key);
+            throw new BackupStorageFailedException(key, exception);
         }
     }
 
@@ -34,23 +35,27 @@ public class S3FileStorage implements FileStorage {
     public Optional<byte[]> get(String key) {
         try {
             return Optional.of(s3Client.getObjectAsBytes(
-                            request -> request.bucket(properties.bucket()).key(key))
+                            request -> request.bucket(properties.backupBucket()).key(key))
                     .asByteArray());
-        } catch (NoSuchKeyException e) {
+        } catch (NoSuchKeyException exception) {
             return Optional.empty();
-        } catch (SdkException e) {
-            throw new BackupStorageFailedException(key);
+        } catch (SdkException exception) {
+            throw new BackupStorageFailedException(key, exception);
         }
     }
 
     @Override
     public List<String> list(String prefix) {
-        return s3Client
-                .listObjectsV2Paginator(
-                        request -> request.bucket(properties.bucket()).prefix(prefix))
-                .contents()
-                .stream()
-                .map(S3Object::key)
-                .toList();
+        try {
+            return s3Client
+                    .listObjectsV2Paginator(
+                            request -> request.bucket(properties.backupBucket()).prefix(prefix))
+                    .contents()
+                    .stream()
+                    .map(S3Object::key)
+                    .toList();
+        } catch (SdkException exception) {
+            throw new BackupStorageFailedException(prefix, exception);
+        }
     }
 }

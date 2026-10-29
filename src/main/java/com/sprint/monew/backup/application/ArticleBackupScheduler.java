@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class ArticleBackupScheduler {
 
     private final JobOperator jobOperator;
-    private final Job job;
+    private final Job articleBackupJob;
     private final Clock clock;
 
     @Scheduled(cron = "${monew.backup.cron:0 0 3 * * *}", zone = "Asia/Seoul")
@@ -28,7 +28,7 @@ public class ArticleBackupScheduler {
                 .toJobParameters();
 
         try {
-            jobOperator.start(job, parameters);
+            jobOperator.start(articleBackupJob, parameters);
         } catch (Exception exception) {
             log.error("기사 백업 배치 실행 실패: date={}", yesterday, exception);
         }
