@@ -32,5 +32,5 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     int decreaseCommentCount(@Param("articleId") UUID articleId);
 
     @Query("select a from Article a where a.createdAt >= :from and a.createdAt < :to and a.deletedAt is null")
-    List<Article> findByCreatedAtRange(Instant from, Instant to);
+    List<Article> findByCreatedAtRange(@Param("from") Instant from, @Param("to") Instant to);
 }

@@ -9,4 +9,9 @@ public class BackupException extends MonewException {
     public BackupException(ErrorCode errorCode, Map<String, Object> details) {
         super(errorCode, details);
     }
+
+    public BackupException(ErrorCode errorCode, Map<String, Object> details, Throwable cause) {
+        super(errorCode, details);
+        initCause(cause);
+    }
 }

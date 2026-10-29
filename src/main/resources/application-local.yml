@@ -35,3 +35,10 @@ news:
   naver:
     client-id: ${NAVER_CLIENT_ID:}
     client-secret: ${NAVER_CLIENT_SECRET:}
+
+monew:
+  storage:
+    s3:
+      region: ${AWS_REGION:ap-northeast-2}
+      backup-bucket: ${AWS_S3_BACKUP_BUCKET:}
+      log-bucket: ${AWS_S3_LOG_BUCKET:}
