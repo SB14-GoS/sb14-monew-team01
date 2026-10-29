@@ -69,6 +69,9 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
+	// RSS XML 파싱
+	implementation 'tools.jackson.dataformat:jackson-dataformat-xml'
+
 	// Test
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

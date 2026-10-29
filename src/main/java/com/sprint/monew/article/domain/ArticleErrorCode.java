@@ -17,7 +17,8 @@ public enum ArticleErrorCode implements ErrorCode {
     ARTICLE_SOURCE_REQUIRED(Level.WARN, HttpStatus.BAD_REQUEST, "기사 출처는 필수입니다."),
     ARTICLE_SOURCE_URL_REQUIRED(Level.WARN, HttpStatus.BAD_REQUEST, "기사 원본 URL은 필수입니다."),
     ARTICLE_REQUIRED(Level.WARN, HttpStatus.BAD_REQUEST, "연결할 기사는 필수입니다."),
-    INTEREST_ID_REQUIRED(Level.WARN, HttpStatus.BAD_REQUEST, "연결할 관심사 ID는 필수입니다.");
+    INTEREST_ID_REQUIRED(Level.WARN, HttpStatus.BAD_REQUEST, "연결할 관심사 ID는 필수입니다."),
+    INVALID_RSS_RESPONSE(Level.ERROR, HttpStatus.BAD_GATEWAY, "RSS 연결중 문제가 발생했습니다.");
 
     private final Level level;
     private final HttpStatus status;
