@@ -32,3 +32,9 @@ logging:
 
 springdoc:
   paths-to-match: /api/**
+
+news:
+  rss:
+    hankyung-url: https://www.hankyung.com/feed/all-news
+    chosun-url: https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml
+    yeonhap-url: https://www.yna.co.kr/rss/news.xml
