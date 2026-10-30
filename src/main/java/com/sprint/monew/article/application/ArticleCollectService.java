@@ -38,6 +38,8 @@ public class ArticleCollectService {
         rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
         rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
 
+        /* 가져온 Rss 한번에 키워드 포함되는지 검사
+         * 검사 통과된 아이들만 최종 결과에 포함 */
         for (RawArticle article : rssTotalResult) {
             for (String keyword : keywords) {
                 boolean titleMatched = article.title().contains(keyword);
@@ -50,15 +52,16 @@ public class ArticleCollectService {
             }
         }
 
+        /* 중복되는 링크 없이 하려고 중복을 허용하지 않는 Set<> 을사용 */
         Set<String> sourceUrl = new HashSet<>();
-        /* 원본링크 안겹치는 친구들 넣어놓은 리스트 */
+
+        /* 원본링크 안겹치는 객체들 넣어놓은 리스트 */
         List<Article> result = new ArrayList<>();
 
         for (RawArticle each : totalResult) {
-            if (sourceUrl.add(each.sourceUrl()) /* 반환이 boolean */) {
+            if (sourceUrl.add(each.sourceUrl()) /* 반환이 boolean Set에 새로 추가되면 true 추가가 안되면 false */) {
                 Article article = Article.create(
                         each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
-
                 result.add(article);
             }
         }
