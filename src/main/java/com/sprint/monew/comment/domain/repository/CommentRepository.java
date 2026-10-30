@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface CommentRepository extends JpaRepository<Comment, UUID>, CommentQueryRepository {
+public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
     List<Comment> findAllByUserId(UUID userId);
 

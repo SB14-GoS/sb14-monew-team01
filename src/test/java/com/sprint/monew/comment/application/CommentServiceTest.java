@@ -23,6 +23,7 @@ import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentOrderByException;
 import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
+import com.sprint.monew.comment.domain.repository.CommentQueryRepository;
 import com.sprint.monew.comment.domain.repository.CommentRepository;
 import com.sprint.monew.comment.domain.repository.CommentSearchResult;
 import com.sprint.monew.comment.web.dto.CommentDto;
@@ -51,6 +52,9 @@ class CommentServiceTest {
 
     @Mock
     private CommentRepository commentRepository;
+
+    @Mock
+    private CommentQueryRepository commentQueryRepository;
 
     @Mock
     private CommentLikeRepository commentLikeRepository;
@@ -144,6 +148,7 @@ class CommentServiceTest {
                 .isInstanceOf(CommentArticleNotFoundException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+        then(commentQueryRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -161,13 +166,13 @@ class CommentServiceTest {
         Comment thirdComment = mock(Comment.class);
 
         given(articleQueryApi.exists(articleId)).willReturn(true);
-        given(commentRepository.findByArticleId(
+        given(commentQueryRepository.findByArticleId(
                         articleId, requesterId, CommentOrderBy.LIKE_COUNT, SortDirection.DESC, request))
                 .willReturn(List.of(
                         new CommentSearchResult(firstComment, true),
                         new CommentSearchResult(secondComment, false),
                         new CommentSearchResult(thirdComment, true)));
-        given(commentRepository.countByArticleId(articleId)).willReturn(3L);
+        given(commentQueryRepository.countByArticleId(articleId)).willReturn(3L);
         given(userQueryApi.getSummaries(Set.of(firstUserId, secondUserId)))
                 .willReturn(Map.of(
                         firstUserId, new UserSummary(firstUserId, "작성자1"),
@@ -185,9 +190,10 @@ class CommentServiceTest {
                         responseValue -> responseValue.nextCursor(),
                         responseValue -> responseValue.nextAfter())
                 .containsExactly(true, 2, 3L, "5_" + secondComment.getId(), secondCreatedAt);
-        then(commentRepository)
+        then(commentQueryRepository)
                 .should()
                 .findByArticleId(articleId, requesterId, CommentOrderBy.LIKE_COUNT, SortDirection.DESC, request);
+        then(commentQueryRepository).should().countByArticleId(articleId);
         then(userQueryApi).should().getSummaries(Set.of(firstUserId, secondUserId));
     }
 
@@ -205,6 +211,7 @@ class CommentServiceTest {
                 .isInstanceOf(InvalidCommentCursorException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+        then(commentQueryRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -221,6 +228,7 @@ class CommentServiceTest {
                 .isInstanceOf(InvalidCommentCursorException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+        then(commentQueryRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -237,6 +245,7 @@ class CommentServiceTest {
                 .isInstanceOf(InvalidCommentCursorException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+        then(commentQueryRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -253,6 +262,7 @@ class CommentServiceTest {
                 .isInstanceOf(InvalidCommentOrderByException.class);
 
         then(commentRepository).shouldHaveNoInteractions();
+        then(commentQueryRepository).shouldHaveNoInteractions();
     }
 
     @Test

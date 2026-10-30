@@ -13,6 +13,7 @@ import com.sprint.monew.comment.domain.exception.CommentNotFoundException;
 import com.sprint.monew.comment.domain.exception.CommentUserNotFoundException;
 import com.sprint.monew.comment.domain.exception.InvalidCommentCursorException;
 import com.sprint.monew.comment.domain.repository.CommentLikeRepository;
+import com.sprint.monew.comment.domain.repository.CommentQueryRepository;
 import com.sprint.monew.comment.domain.repository.CommentRepository;
 import com.sprint.monew.comment.domain.repository.CommentSearchResult;
 import com.sprint.monew.comment.web.dto.CommentDto;
@@ -41,6 +42,7 @@ public class CommentService {
     private final ArticleCommandApi articleCommandApi;
     private final UserQueryApi userQueryApi;
     private final ApplicationEventPublisher eventPublisher;
+    private final CommentQueryRepository commentQueryRepository;
 
     // 댓글을 등록하고 기사 댓글 수 증가 및 생성 이벤트 발행을 처리한다.
     @Transactional
@@ -77,8 +79,8 @@ public class CommentService {
         validateCursorRequest(request, commentOrderBy);
 
         List<CommentSearchResult> comments =
-                commentRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request);
-        long totalCommentCount = commentRepository.countByArticleId(articleId);
+                commentQueryRepository.findByArticleId(articleId, requesterId, commentOrderBy, direction, request);
+        long totalCommentCount = commentQueryRepository.countByArticleId(articleId);
 
         CursorPageResponse<CommentSearchResult> page = CursorPageResponse.of(
                 comments,
