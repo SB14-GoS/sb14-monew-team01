@@ -34,7 +34,7 @@ public class ArticleCollectService {
 
         List<RawArticle> totalResult = naverNewsClient.fetch(keywords);
 
-        List<RawArticle> rssTotalResult = chosunNewsClient.fetch(keywords);
+        List<RawArticle> rssTotalResult = new ArrayList<>(chosunNewsClient.fetch(keywords));
         rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
         rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
 
@@ -60,11 +60,15 @@ public class ArticleCollectService {
 
         for (RawArticle each : totalResult) {
             if (sourceUrl.add(each.sourceUrl()) /* 반환이 boolean Set에 새로 추가되면 true 추가가 안되면 false */) {
-                Article article = Article.create(
-                        each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
-                result.add(article);
+                /* db 조회해서 이미 원본링크 있으면 저장 안함 */
+                if (articleRepository.findBySourceUrl(each.sourceUrl()).isEmpty()) {
+                    Article article = Article.create(
+                            each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
+                    result.add(article);
+                }
             }
         }
+
         articleRepository.saveAll(result);
     }
 }
