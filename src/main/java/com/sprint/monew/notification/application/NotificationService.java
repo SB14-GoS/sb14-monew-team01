@@ -11,6 +11,7 @@ import com.sprint.monew.notification.domain.NotificationRepository;
 import com.sprint.monew.notification.domain.exception.NotificationNotFoundException;
 import com.sprint.monew.notification.web.dto.NotificationDto;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -99,5 +100,12 @@ public class NotificationService {
     public void createCommentLikeNotification(UUID receiverUserId, UUID commentId, String likerNickname) {
         Notification notification = Notification.ofCommentLike(receiverUserId, commentId, likerNickname);
         notificationRepository.save(notification);
+    }
+
+    // 확인한 알람 1주일 후 삭제 로직
+    @Transactional
+    public int deleteExpireNotification(Instant referenceTime) {
+        Instant cutoff = referenceTime.minus(7, ChronoUnit.DAYS);
+        return notificationRepository.deleteConfirmedBefore(cutoff);
     }
 }
