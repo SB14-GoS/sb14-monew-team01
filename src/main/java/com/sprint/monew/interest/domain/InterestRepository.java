@@ -1,5 +1,6 @@
 package com.sprint.monew.interest.domain;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,4 +27,7 @@ public interface InterestRepository extends JpaRepository<Interest, UUID> {
     @Query(
             "UPDATE Interest i SET i.subscriberCount = i.subscriberCount - 1 WHERE i.id = :interestId AND i.subscriberCount > 0")
     void decreaseSubscriberCount(@Param("interestId") UUID interestId);
+
+    @Query("select i.id from Interest i where i.id in :ids")
+    List<UUID> findIdsIn(@Param("ids") Collection<UUID> ids);
 }
