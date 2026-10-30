@@ -62,7 +62,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Copy docker-compose.yml to EC2
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
@@ -72,7 +72,7 @@ jobs:
           target: "/home/ubuntu/"
 
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.0
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
