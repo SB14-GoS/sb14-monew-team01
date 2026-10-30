@@ -20,10 +20,11 @@ public class NaverNewsClientConfig {
             @Value("${news.naver.client-id}") String clientId,
             @Value("${news.naver.client-secret}") String clientSecret) {
 
-        /* 네이버는 JSON 본문을 text/plain으로 응답하기도 한다. 때문에 json으로 변경해주기 */
+        /* JSON 본문이 text/plain 또는 text/html로 전달되는 경우도 읽는다. */
         JacksonJsonHttpMessageConverter jsonConverter = new JacksonJsonHttpMessageConverter();
         List<MediaType> supportedMediaTypes = new ArrayList<>(jsonConverter.getSupportedMediaTypes());
         supportedMediaTypes.add(MediaType.TEXT_PLAIN);
+        supportedMediaTypes.add(MediaType.TEXT_HTML);
         jsonConverter.setSupportedMediaTypes(supportedMediaTypes);
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -33,6 +34,8 @@ public class NaverNewsClientConfig {
         /* 요청 보낼 클라이언트 생성 */
         return RestClient.builder()
                 .requestFactory(requestFactory)
+                // 원문 기록과 DTO 변환에서 응답 본문을 각각 읽는다.
+                .bufferContent((uri, method) -> true)
                 .baseUrl("https://naverapihub.apigw.ntruss.com")
                 .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                 .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
