@@ -1,0 +1,12 @@
+services:
+  monew-app:
+    image: ${ECR_REGISTRY}/monew-backend:latest
+    container_name: monew-backend-container
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
+    restart: unless-stopped
