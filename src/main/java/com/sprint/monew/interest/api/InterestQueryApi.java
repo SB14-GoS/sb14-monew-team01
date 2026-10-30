@@ -1,6 +1,8 @@
 package com.sprint.monew.interest.api;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public interface InterestQueryApi {
@@ -13,4 +15,6 @@ public interface InterestQueryApi {
 
     // 특정 사용자가 구독 중인 관심사를 조회하는 메서드
     List<InterestSummary> getSubscribedInterests(UUID userId);
+
+    Set<UUID> findExistingIds(Collection<UUID> interestIds);
 }

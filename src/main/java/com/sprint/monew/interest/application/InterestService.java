@@ -18,6 +18,8 @@ import com.sprint.monew.interest.web.dto.InterestDto;
 import com.sprint.monew.interest.web.dto.InterestRegisterRequest;
 import com.sprint.monew.interest.web.dto.InterestSearchRequest;
 import com.sprint.monew.interest.web.dto.InterestUpdateRequest;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -116,6 +118,14 @@ public class InterestService implements InterestQueryApi {
                 .map(s -> new InterestSummary(
                         s.getInterest().getId(), s.getInterest().getName()))
                 .toList();
+    }
+
+    @Override
+    public Set<UUID> findExistingIds(Collection<UUID> interestIds) {
+        if (interestIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(interestRepository.findIdsIn(interestIds));
     }
 
     // ========================================================================================
