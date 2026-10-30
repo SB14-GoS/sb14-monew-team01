@@ -1,6 +1,6 @@
 services:
   monew-app:
-    image: ${ECR_REGISTRY}/monew-backend:latest
+    image: ${ECR_REGISTRY}/monew-backend:${IMAGE_TAG}
     container_name: monew-backend-container
     ports:
       - "8080:8080"
@@ -10,3 +10,9 @@ services:
       - TZ=Asia/Seoul
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

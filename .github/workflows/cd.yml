@@ -55,6 +55,7 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
@@ -65,6 +66,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          fingerprint: ${{ secrets.EC2_SSH_FINGERPRINT }}
           source: "docker-compose.yml"
           target: "/home/ubuntu/"
 
@@ -80,22 +82,27 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           AWS_S3_BACKUP_BUCKET: ${{ secrets.AWS_S3_BACKUP_BUCKET }}
           AWS_S3_LOG_BUCKET: ${{ secrets.AWS_S3_LOG_BUCKET }}
+          IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: ECR_REGISTRY,RDS_ENDPOINT,RDS_USERNAME,RDS_PASSWORD,MONGO_URI,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,AWS_S3_BACKUP_BUCKET,AWS_S3_LOG_BUCKET
+          fingerprint: ${{ secrets.EC2_SSH_FINGERPRINT }}
+          envs: ECR_REGISTRY,RDS_ENDPOINT,RDS_USERNAME,RDS_PASSWORD,MONGO_URI,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,AWS_S3_BACKUP_BUCKET,AWS_S3_LOG_BUCKET,IMAGE_TAG
           script: |
             # GitHub Secrets를 가져와서 EC2 서버 안에 .env 파일 자동 생성
+            umask 077 # 파일 생성 전 권한 설정 추가
             echo "SPRING_PROFILES_ACTIVE=prod" > /home/ubuntu/.env
-            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://$RDS_ENDPOINT:5432/monew" >> /home/ubuntu/.env
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://$RDS_ENDPOINT:5432/monew?sslmode=require" >> /home/ubuntu/.env
             echo "SPRING_DATASOURCE_USERNAME=$RDS_USERNAME" >> /home/ubuntu/.env
-            echo "SPRING_DATASOURCE_PASSWORD=$RDS_PASSWORD" >> /home/ubuntu/.env
-            echo "SPRING_DATA_MONGODB_URI=$MONGO_URI" >> /home/ubuntu/.env
-            echo "SPRING_JPA_HIBERNATE_DDL_AUTO=update" >> /home/ubuntu/.env
+            # 비밀값은 Docker Compose 보간 방지를 위해 작은따옴표로 감싸서 기록
+            echo "SPRING_DATASOURCE_PASSWORD='$RDS_PASSWORD'" >> /home/ubuntu/.env
+            # 환경 변수 키 이름을 MONGO_URI로 변경
+            echo "MONGO_URI='$MONGO_URI'" >> /home/ubuntu/.env
             echo "ECR_REGISTRY=$ECR_REGISTRY" >> /home/ubuntu/.env
+            echo "IMAGE_TAG=$IMAGE_TAG" >> /home/ubuntu/.env
             echo "NAVER_CLIENT_ID=$NAVER_CLIENT_ID" >> /home/ubuntu/.env
-            echo "NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET" >> /home/ubuntu/.env
+            echo "NAVER_CLIENT_SECRET='$NAVER_CLIENT_SECRET'" >> /home/ubuntu/.env
             echo "AWS_REGION=ap-northeast-2" >> /home/ubuntu/.env
             echo "AWS_S3_BACKUP_BUCKET=$AWS_S3_BACKUP_BUCKET" >> /home/ubuntu/.env
             echo "AWS_S3_LOG_BUCKET=$AWS_S3_LOG_BUCKET" >> /home/ubuntu/.env
@@ -105,7 +112,7 @@ jobs:
 
             # 도커 컴포즈 실행 (최신 이미지 pull 후 재시작)
             cd /home/ubuntu
-            docker compose pull
-            docker compose up -d
+            docker compose -f docker-compose.yml pull
+            docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
 
             docker image prune -f
