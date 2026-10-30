@@ -2,6 +2,7 @@ package com.sprint.monew.article.infra.source;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -15,7 +16,7 @@ import com.sprint.monew.article.infra.source.dto.RssChannel;
 import com.sprint.monew.article.infra.source.dto.RssItem;
 import com.sprint.monew.article.infra.source.dto.RssResponse;
 import java.time.Instant;
-import java.util.Collections;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -38,32 +39,53 @@ class RssNewsClientTest {
 
     @ParameterizedTest
     @MethodSource("invalidResponses")
-    void rejectsMissingResponseChannelOrRequiredArticleFields(RssResponse response) {
-        when(restClient.get().uri(FEED_URL).retrieve().body(RssResponse.class)).thenReturn(response);
+    void rejectsMissingResponseOrChannel(RssResponse response) {
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
 
         assertThatThrownBy(() -> client.fetch(List.of())).isInstanceOf(InvalidRssResponseException.class);
     }
 
     static Stream<RssResponse> invalidResponses() {
+        return Stream.of(null, new RssResponse(null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("itemsWithoutFieldValidation")
+    void leavesTitleAndLinkValidationToTheArticleDomain(RssItem item) {
+        RssResponse response = new RssResponse(new RssChannel(List.of(item)));
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
+
+        assertThat(client.fetch(List.of())).singleElement().satisfies(article -> {
+            assertThat(article.title()).isEqualTo(item.title());
+            assertThat(article.sourceUrl()).isEqualTo(item.link());
+        });
+    }
+
+    static Stream<RssItem> itemsWithoutFieldValidation() {
         return Stream.of(
-                null,
-                new RssResponse(null),
-                new RssResponse(new RssChannel(Collections.singletonList(null))),
-                new RssResponse(new RssChannel(List.of(new RssItem(null, ARTICLE_URL, PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", null, PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", ARTICLE_URL, null, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("", ARTICLE_URL, PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", "", PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", ARTICLE_URL, "", "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem(" \t\n", ARTICLE_URL, PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", " \t\n", PUB_DATE, "요약")))),
-                new RssResponse(new RssChannel(List.of(new RssItem("제목", ARTICLE_URL, " \t\n", "요약")))));
+                new RssItem("", ARTICLE_URL, PUB_DATE, "요약"),
+                new RssItem(" \t\n", ARTICLE_URL, PUB_DATE, "요약"),
+                new RssItem("제목", "", PUB_DATE, "요약"),
+                new RssItem("제목", " \t\n", PUB_DATE, "요약"));
+    }
+
+    @Test
+    void doesNotHideDateConversionFailuresAsEmptyResults() {
+        RssResponse response =
+                new RssResponse(new RssChannel(List.of(new RssItem("제목", ARTICLE_URL, "invalid-date", "요약"))));
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
+
+        assertThatThrownBy(() -> client.fetch(List.of())).isInstanceOf(DateTimeParseException.class);
     }
 
     @ParameterizedTest
     @MethodSource("emptyResponses")
     void returnsEmptyListWhenChannelHasNoArticles(RssResponse response) {
-        when(restClient.get().uri(FEED_URL).retrieve().body(RssResponse.class)).thenReturn(response);
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
 
         assertThat(client.fetch(List.of())).isEmpty();
     }
@@ -76,7 +98,8 @@ class RssNewsClientTest {
     void restoresHtmlEntitiesInTitleAndSummary() {
         RssResponse response = new RssResponse(new RssChannel(
                 List.of(new RssItem("반도체 &quot;호황&quot; &amp; 성장", ARTICLE_URL, PUB_DATE, "&#39;전망&#39; &lt;속보&gt;"))));
-        when(restClient.get().uri(FEED_URL).retrieve().body(RssResponse.class)).thenReturn(response);
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
 
         assertThat(client.fetch(List.of())).singleElement().satisfies(article -> {
             assertThat(article.title()).isEqualTo("반도체 \"호황\" & 성장");
@@ -134,7 +157,8 @@ class RssNewsClientTest {
     void usesEmptySummaryOnlyWhenDescriptionIsNull(String description) {
         RssResponse response =
                 new RssResponse(new RssChannel(List.of(new RssItem("기사 제목", ARTICLE_URL, PUB_DATE, description))));
-        when(restClient.get().uri(FEED_URL).retrieve().body(RssResponse.class)).thenReturn(response);
+        when(restClient.get().uri(FEED_URL).retrieve().onStatus(any(), any()).body(RssResponse.class))
+                .thenReturn(response);
 
         assertThat(client.fetch(List.of()))
                 .containsExactly(new RawArticle(

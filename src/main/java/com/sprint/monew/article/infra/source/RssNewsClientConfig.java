@@ -17,7 +17,11 @@ public class RssNewsClientConfig {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(3));
         requestFactory.setReadTimeout(Duration.ofSeconds(10));
-        return RestClient.builder().requestFactory(requestFactory).build();
+        // 원문 기록과 DTO 변환에서 응답 본문을 각각 읽는다.
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .bufferContent((uri, method) -> true)
+                .build();
     }
 
     @Bean

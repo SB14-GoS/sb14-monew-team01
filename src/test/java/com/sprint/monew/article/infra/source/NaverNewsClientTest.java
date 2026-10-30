@@ -129,10 +129,11 @@ class NaverNewsClientTest {
                                 "두 번째 요약"));
     }
 
-    @Test
-    @DisplayName("설정 분리 후에도 text/plain으로 전달된 JSON 응답을 읽는다")
-    void readsJsonServedAsTextPlain() {
-        contentType = "text/plain;charset=UTF-8";
+    @ParameterizedTest
+    @ValueSource(strings = {"text/plain;charset=UTF-8", "text/html;charset=UTF-8"})
+    @DisplayName("text/plain 또는 text/html로 전달된 JSON 응답을 읽는다")
+    void readsJsonWithNonJsonContentType(String responseContentType) {
+        contentType = responseContentType;
 
         assertThat(client.fetch(List.of("북한"))).hasSize(2);
     }
@@ -192,12 +193,39 @@ class NaverNewsClientTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"{}", "{\"items\":null}", "null"})
-    @DisplayName("items가 누락되거나 null이면 커스텀 예외를 던진다")
-    void missingItemsThrowCustomException(String responseBody) {
+    @ValueSource(strings = {"{}", "{\"items\":null}"})
+    @DisplayName("items가 누락되거나 null이면 빈 결과로 처리하고 다음 키워드도 요청한다")
+    void missingItemsAreEmptyResults(String responseBody) {
         body = responseBody;
 
+        assertThat(client.fetch(List.of("북한", "경제"))).isEmpty();
+        assertThat(requests).hasSize(2);
+    }
+
+    @Test
+    void nullJsonBodyIsAnInvalidResponse() {
+        body = "null";
+
         assertInvalidResponse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "\"description\":null,", "\"description\":\"\","})
+    @DisplayName("선택값인 기사 요약이 없거나 null이어도 빈 문자열로 수집한다")
+    void missingDescriptionIsAnEmptySummary(String descriptionField) {
+        body = """
+                {"items":[{
+                  "title":"기사 제목",
+                  "originallink":"https://publisher.example/articles/1",
+                  %s
+                  "pubDate":"Wed, 28 Oct 2026 10:44:00 +0900"
+                }]}
+                """.formatted(descriptionField);
+
+        assertThat(client.fetch(List.of("경제"))).singleElement().satisfies(article -> {
+            assertThat(article.title()).isEqualTo("기사 제목");
+            assertThat(article.summary()).isEmpty();
+        });
     }
 
     private void assertInvalidResponse() {
