@@ -3,7 +3,8 @@ name: CD - Deploy to AWS EC2
 on:
   push:
     branches:
-      - main  # 요구사항: main 브랜치에 병합(push)될 때 자동 실행
+      - main
+# 요구사항: main 브랜치에 병합(push)될 때 자동 실행
 
 env:
   AWS_REGION: ap-northeast-2
@@ -57,8 +58,8 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@master
@@ -90,19 +91,26 @@ jobs:
           fingerprint: ${{ secrets.EC2_SSH_FINGERPRINT }}
           envs: ECR_REGISTRY,RDS_ENDPOINT,RDS_USERNAME,RDS_PASSWORD,MONGO_URI,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,AWS_S3_BACKUP_BUCKET,AWS_S3_LOG_BUCKET,IMAGE_TAG
           script: |
+            # 에러 발생 시 즉시 스크립트 종료
+            set -e
             # GitHub Secrets를 가져와서 EC2 서버 안에 .env 파일 자동 생성
+
             umask 077 # 파일 생성 전 권한 설정 추가
             echo "SPRING_PROFILES_ACTIVE=prod" > /home/ubuntu/.env
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://$RDS_ENDPOINT:5432/monew?sslmode=require" >> /home/ubuntu/.env
             echo "SPRING_DATASOURCE_USERNAME=$RDS_USERNAME" >> /home/ubuntu/.env
-            # 비밀값은 Docker Compose 보간 방지를 위해 작은따옴표로 감싸서 기록
-            echo "SPRING_DATASOURCE_PASSWORD='$RDS_PASSWORD'" >> /home/ubuntu/.env
-            # 환경 변수 키 이름을 MONGO_URI로 변경
-            echo "MONGO_URI='$MONGO_URI'" >> /home/ubuntu/.env
+
+            # Compose 규칙에 따른 이스케이프 함수 정의
+            compose_escape() {
+              printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\$/g'
+            }
+
+            printf 'SPRING_DATASOURCE_PASSWORD="%s"\n' "$(compose_escape "$RDS_PASSWORD")" >> /home/ubuntu/.env
+            printf 'MONGO_URI="%s"\n' "$(compose_escape "$MONGO_URI")" >> /home/ubuntu/.env
             echo "ECR_REGISTRY=$ECR_REGISTRY" >> /home/ubuntu/.env
             echo "IMAGE_TAG=$IMAGE_TAG" >> /home/ubuntu/.env
-            echo "NAVER_CLIENT_ID=$NAVER_CLIENT_ID" >> /home/ubuntu/.env
-            echo "NAVER_CLIENT_SECRET='$NAVER_CLIENT_SECRET'" >> /home/ubuntu/.env
+            printf 'NAVER_CLIENT_ID="%s"\n' "$(compose_escape "$NAVER_CLIENT_ID")" >> /home/ubuntu/.env
+            printf 'NAVER_CLIENT_SECRET="%s"\n' "$(compose_escape "$NAVER_CLIENT_SECRET")" >> /home/ubuntu/.env
             echo "AWS_REGION=ap-northeast-2" >> /home/ubuntu/.env
             echo "AWS_S3_BACKUP_BUCKET=$AWS_S3_BACKUP_BUCKET" >> /home/ubuntu/.env
             echo "AWS_S3_LOG_BUCKET=$AWS_S3_LOG_BUCKET" >> /home/ubuntu/.env
