@@ -46,7 +46,13 @@ class ArticleBackupServiceTest {
     @DisplayName("그날 기사를 JSON으로 만들어 날짜 키로 저장하고 건수를 반환한다")
     void backupStoresArticlesOfTheDay() {
         ArticleBackupDto article = new ArticleBackupDto(
-                UUID.randomUUID(), "제목", Instant.parse("2026-10-28T01:00:00Z"), "요약", "NAVER", "https://a.com/1");
+                UUID.randomUUID(),
+                List.of(UUID.randomUUID()),
+                "제목",
+                Instant.parse("2026-10-28T01:00:00Z"),
+                "요약",
+                "NAVER",
+                "https://a.com/1");
         given(articleBackupApi.findAllCreatedBetween(BackupKey.startOf(DATE), BackupKey.endOf(DATE)))
                 .willReturn(List.of(article));
 
@@ -70,6 +76,20 @@ class ArticleBackupServiceTest {
         verify(fileStorage).put(anyString(), content.capture());
         assertThat(count).isZero();
         assertThat(new String(content.getValue())).isEqualTo("[]");
+    }
+
+    @Test
+    @DisplayName("관심사 정보가 없는 옛 백업도 빈 관심사 목록으로 읽는다")
+    void readsLegacyBackupWithoutInterestIds() {
+        String legacy = """
+                [{"id":"%s","title":"제목","publishedDate":"2026-10-28T01:00:00Z","summary":"요약","source":"NAVER","sourceUrl":"https://a.com/1"}]
+                """.formatted(UUID.randomUUID());
+
+        List<ArticleBackupRecord> records = jsonMapper.readValue(legacy, new TypeReference<>() {});
+
+        assertThat(records)
+                .singleElement()
+                .satisfies(record -> assertThat(record.interestIds()).isEmpty());
     }
 
     @Test
