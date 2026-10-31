@@ -5,12 +5,15 @@ on:
     branches:
       - main  # 요구사항: main 브랜치에 병합(push)될 때 자동 실행
 
+permissions:
+  contents: read
+
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: monew-backend
   ECS_CLUSTER: monew-cluster
-  ECS_SERVICE: monew-backend-task-service-649yao96
-  ECS_TASK_DEFINITION: monew-backend-task
+  ECS_SERVICE: monew-backend-ec2-service
+  ECS_TASK_DEFINITION: monew-backend-ec2-task
   CONTAINER_NAME: monew-backend-container
 
 jobs:
