@@ -23,6 +23,8 @@ import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import com.sprint.monew.user.web.dto.UserUpdateRequest;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
@@ -36,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -355,6 +358,35 @@ public class UserServiceTest {
 
         assertThatThrownBy(() -> userService.updateNickname(userId, otherUserId, new UserUpdateRequest("버즈")))
                 .isInstanceOf(UserUpdateForbiddenException.class);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("기준 시각 이전에 탈퇴한 사용자를 물리 삭제하고 삭제 이벤트를 발행한다")
+    void purgeDeletedUsers() {
+        Instant threshold = Instant.now();
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        ReflectionTestUtils.setField(user, "id", userId);
+        given(userRepository.findAllByDeletedAtBefore(threshold)).willReturn(List.of(user));
+
+        int purged = userService.purgeDeletedUsers(threshold);
+
+        assertThat(purged).isEqualTo(1);
+        verify(userRepository).delete(user);
+        verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
+    }
+
+    @Test
+    @DisplayName("삭제 대상이 없으면 아무것도 삭제하지 않는다")
+    void purgeDeletedUsersWithNoTarget() {
+        Instant threshold = Instant.now();
+        given(userRepository.findAllByDeletedAtBefore(threshold)).willReturn(List.of());
+
+        int purged = userService.purgeDeletedUsers(threshold);
+
+        assertThat(purged).isZero();
+        verify(userRepository, never()).delete(any());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
