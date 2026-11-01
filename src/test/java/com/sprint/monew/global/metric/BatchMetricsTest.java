@@ -111,7 +111,7 @@ class BatchMetricsTest {
     @Test
     @DisplayName("Step 종료 시 리스너를 통해 수집 건수와 실패 건수가 기록된다")
     void afterStepRecordsCollectedAndFailedCounts() {
-        // given: 20건 저장 성공하고, 총 4건(스킵 3 + 예외 1) 실패한 가짜 Step 상황 연출
+        // given: 20건 저장 성공하고, 스킵 3건(읽기 1 + 처리 1 + 쓰기 1) 및 예외 1건이 발생한 가짜 Step 상황 연출
         StepExecution stepExecution = mock(StepExecution.class);
         JobExecution jobExecution = mock(JobExecution.class);
         JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
@@ -128,7 +128,7 @@ class BatchMetricsTest {
         // when: 리스너의 afterStep 실행
         ExitStatus exitStatus = batchMetricsListener.afterStep(stepExecution);
 
-        // then: 수집 20건, 실패 4건이 정확히 기록되었는지 확인
+        // then: 수집 20건, 실패 3건이 정확히 기록되었는지 확인(Step 예외 1건은 제외)
         Counter collectedCounter = meterRegistry
                 .find(BatchMetrics.COLLECTED_COUNT_METRIC)
                 .tag("job", "articleCollectJob")
@@ -142,6 +142,6 @@ class BatchMetricsTest {
         assertThat(collectedCounter).isNotNull();
         assertThat(collectedCounter.count()).isEqualTo(20.0);
         assertThat(failedCounter).isNotNull();
-        assertThat(failedCounter.count()).isEqualTo(4.0);
+        assertThat(failedCounter.count()).isEqualTo(3.0);
     }
 }

@@ -44,11 +44,9 @@ public class BatchMetricsListener implements JobExecutionListener, StepExecution
 
         long collectedCount = stepExecution.getWriteCount();
 
-        // 읽다가 스킵된 건수 + 가공하다 스킵된 건수 + 쓰다가 스킵된 건수 + 발생한 에러 개수 합산
         long failedCount = stepExecution.getReadSkipCount()
                 + stepExecution.getProcessSkipCount()
-                + stepExecution.getWriteSkipCount()
-                + stepExecution.getFailureExceptions().size();
+                + stepExecution.getWriteSkipCount();
 
         batchMetrics.incrementCollected(jobName, collectedCount);
         batchMetrics.incrementFailed(jobName, failedCount);
