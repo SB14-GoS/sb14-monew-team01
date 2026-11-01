@@ -15,6 +15,8 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -166,6 +168,27 @@ class NaverNewsClientTest {
                         "https://publisher.example/articles/2",
                         "https://publisher.example/articles/1",
                         "https://publisher.example/articles/2");
+    }
+
+    @Test
+    @DisplayName("전체 검색 결과가 많아도 키워드별로 처음 100건만 한 번 요청한다")
+    void collectsOnlyFirstHundredResultsPerKeyword() {
+        String items = IntStream.rangeClosed(1, 100)
+                .mapToObj(id -> """
+                        {"title":"경제 기사 %d","originallink":"https://publisher.example/articles/%d",
+                         "description":"기사 요약","pubDate":"Wed, 28 Oct 2026 10:44:00 +0900"}
+                        """.formatted(id, id))
+                .collect(Collectors.joining(","));
+        body = "{\"total\":10000,\"start\":1,\"display\":100,\"items\":[%s]}".formatted(items);
+
+        List<RawArticle> result = client.fetch(List.of("북한", "경제"));
+
+        assertThat(requests)
+                .extracting(Request::rawQuery)
+                .containsExactly(
+                        "query=%EB%B6%81%ED%95%9C&display=100&sort=date&format=json",
+                        "query=%EA%B2%BD%EC%A0%9C&display=100&sort=date&format=json");
+        assertThat(result).hasSize(200);
     }
 
     @Test
