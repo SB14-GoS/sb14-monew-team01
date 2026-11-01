@@ -16,6 +16,7 @@ import com.sprint.monew.user.web.dto.UserDto;
 import com.sprint.monew.user.web.dto.UserLoginRequest;
 import com.sprint.monew.user.web.dto.UserRegisterRequest;
 import com.sprint.monew.user.web.dto.UserUpdateRequest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -109,6 +110,16 @@ public class UserService implements UserQueryApi {
         User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
         userRepository.delete(user);
         eventPublisher.publishEvent(new UserDeletedEvent(userId));
+    }
+
+    @Transactional
+    public int purgeDeletedUsers(Instant threshold) {
+        List<User> users = userRepository.findAllByDeletedAtBefore(threshold);
+        for (User user : users) {
+            userRepository.delete(user);
+            eventPublisher.publishEvent(new UserDeletedEvent(user.getId()));
+        }
+        return users.size();
     }
 
     private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
