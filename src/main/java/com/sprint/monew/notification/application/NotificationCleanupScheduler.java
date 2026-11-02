@@ -28,7 +28,6 @@ public class NotificationCleanupScheduler {
             jobOperator.start(notificationCleanupJob, parameters);
         } catch (Exception exception) {
             log.error("알림 정리 배치 실행 실패", exception);
-            throw new IllegalStateException("알림 정리 배치 실행 실패", exception);
         }
     }
 

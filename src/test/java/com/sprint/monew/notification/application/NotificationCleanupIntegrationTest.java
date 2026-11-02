@@ -17,6 +17,7 @@ import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,6 +35,9 @@ class NotificationCleanupIntegrationTest {
 
     @Autowired
     JobOperator jobOperator;
+
+    @Autowired
+    JobRepository jobRepository;
 
     @Autowired
     @Qualifier("notificationCleanupJob")
@@ -67,23 +71,30 @@ class NotificationCleanupIntegrationTest {
     }
 
     @Test
-    @DisplayName("정리 배치를 실행하면 만료된 확인 알림이 실제로 삭제된다")
+    @DisplayName("정리 배치는 요청 시각을 기준으로 삭제하고 삭제 건수를 Job 실행에 기록한다")
     void jobDeletesExpiredNotifications() throws Exception {
-        Notification expired = save(true, Instant.now().minus(8, ChronoUnit.DAYS));
-        Notification recent = save(true, Instant.now().minus(6, ChronoUnit.DAYS));
+        Instant requestedAt = Instant.parse("2020-01-15T00:00:00Z");
+        Instant cutoff = requestedAt.minus(7, ChronoUnit.DAYS);
+        Notification expired = save(true, cutoff.minusSeconds(1));
+        Notification boundary = save(true, cutoff);
+        Notification recent = save(true, cutoff.plusSeconds(1));
         Notification unread = save(false, null);
 
         var execution = jobOperator.start(
                 cleanupJob,
                 new JobParametersBuilder()
+                        .addString("requestedAt", requestedAt.toString())
                         .addString("testRun", UUID.randomUUID().toString())
                         .toJobParameters());
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        var storedExecution = jobRepository.getJobExecution(execution.getId());
+        assertThat(storedExecution).isNotNull();
+        assertThat(storedExecution.getExecutionContext().getInt("deletedCount")).isEqualTo(1);
         assertThat(notificationRepository.existsById(expired.getId())).isFalse();
         assertThat(notificationRepository.findAll())
                 .extracting(Notification::getId)
-                .containsExactlyInAnyOrder(recent.getId(), unread.getId());
+                .containsExactlyInAnyOrder(boundary.getId(), recent.getId(), unread.getId());
     }
 
     private Notification save(boolean confirmed, Instant confirmedAt) {
