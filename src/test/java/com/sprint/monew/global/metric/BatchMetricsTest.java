@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -174,9 +175,9 @@ class BatchMetricsTest {
     }
 
     @Test
-    @DisplayName("Step 종료 시 리스너를 통해 수집 건수와 스킵 기반 실패 건수(예외 제외)가 기록된다")
+    @DisplayName("Step 완료 시 리스너를 통해 수집 건수와 스킵 기반 실패 건수가 기록된다")
     void afterStepRecordsCollectedAndFailedCounts() {
-        // given: 20건 저장 성공하고, 스킵 3건(읽기 1 + 처리 1 + 쓰기 1)이 발생한 가짜 Step 상황 연출
+        // given: 20건 저장 성공하고, 스킵 3건(읽기 1 + 처리 1 + 쓰기 1)이 발생한 완료(COMPLETED) Step 연출
         StepExecution stepExecution = mock(StepExecution.class);
         JobExecution jobExecution = mock(JobExecution.class);
         JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
@@ -192,7 +193,7 @@ class BatchMetricsTest {
         // when: 리스너의 afterStep 실행
         ExitStatus exitStatus = batchMetricsListener.afterStep(stepExecution);
 
-        // then: 수집 20건과 스킵 3건만 실패 건수로 기록되었는지 확인 (Step 예외 1건은 제외)
+        // then: 수집 20건과 스킵 3건이 기록되고 COMPLETED 상태를 반환하는지 확인
         Counter collectedCounter = meterRegistry
                 .find(BatchMetrics.COLLECTED_COUNT_METRIC)
                 .tag("job", "articleCollectJob")
@@ -205,6 +206,37 @@ class BatchMetricsTest {
         assertThat(exitStatus).isEqualTo(ExitStatus.COMPLETED);
         assertThat(collectedCounter).isNotNull();
         assertThat(collectedCounter.count()).isEqualTo(20.0);
+        assertThat(failedCounter).isNotNull();
+        assertThat(failedCounter.count()).isEqualTo(3.0);
+    }
+
+    @Test
+    @DisplayName("Step 예외는 실패 건수에 포함되지 않는다")
+    void afterStepExcludesFailureExceptionFromFailedCount() {
+        // given: 스킵 3건과 Step 실행 예외 1건이 함께 발생해 FAILED된 Step 연출
+        StepExecution stepExecution = mock(StepExecution.class);
+        JobExecution jobExecution = mock(JobExecution.class);
+        JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
+
+        given(stepExecution.getJobExecution()).willReturn(jobExecution);
+        given(jobExecution.getJobInstance()).willReturn(jobInstance);
+        given(stepExecution.getStatus()).willReturn(BatchStatus.FAILED);
+        given(stepExecution.getReadSkipCount()).willReturn(1L);
+        given(stepExecution.getProcessSkipCount()).willReturn(1L);
+        given(stepExecution.getWriteSkipCount()).willReturn(1L);
+        given(stepExecution.getExitStatus()).willReturn(ExitStatus.FAILED);
+        given(stepExecution.getFailureExceptions()).willReturn(List.of(new RuntimeException("step failure")));
+
+        // when
+        ExitStatus exitStatus = batchMetricsListener.afterStep(stepExecution);
+
+        // then: Step 예외(1건)는 제외되고 스킵 건수(3건)만 실패 건수에 반영됨
+        Counter failedCounter = meterRegistry
+                .find(BatchMetrics.FAILED_COUNT_METRIC)
+                .tag("job", "articleCollectJob")
+                .counter();
+
+        assertThat(exitStatus).isEqualTo(ExitStatus.FAILED);
         assertThat(failedCounter).isNotNull();
         assertThat(failedCounter.count()).isEqualTo(3.0);
     }
