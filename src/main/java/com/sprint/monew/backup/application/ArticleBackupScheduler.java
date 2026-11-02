@@ -20,7 +20,7 @@ public class ArticleBackupScheduler {
     private final Job articleBackupJob;
     private final Clock clock;
 
-    @Scheduled(cron = "${monew.backup.cron:0 0 3 * * *}", zone = "Asia/Seoul")
+    @Scheduled(cron = "${monew.backup.cron:0 0 1 * * *}", zone = "Asia/Seoul")
     public void backupYesterday() {
         LocalDate yesterday = LocalDate.now(clock).minusDays(1);
         JobParameters parameters = new JobParametersBuilder()
