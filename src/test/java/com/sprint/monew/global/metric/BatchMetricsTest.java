@@ -9,7 +9,6 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +27,6 @@ class BatchMetricsTest {
 
     @BeforeEach
     void setUp() {
-        // 무거운 스프링 서버를 띄우지 않고 메모리에서 빠르게 테스트할 수 있는 간이 계기판
         meterRegistry = new SimpleMeterRegistry();
         batchMetrics = new BatchMetrics(meterRegistry);
         batchMetricsListener = new BatchMetricsListener(batchMetrics);
@@ -75,23 +73,23 @@ class BatchMetricsTest {
     }
 
     @Test
-    @DisplayName("Job 종료 시 리스너를 통해 소요 시간과 실패 여부가 기록된다")
+    @DisplayName("Job이 FAILED 상태로 종료되면 고정된 시작·종료 시각 기준 소요 시간과 실패 건수가 기록된다")
     void afterJobRecordsDurationAndFailure() {
-        // given: 5초 동안 돌다가 실패(FAILED)한 가짜 Job 상황 연출
+        // given: 정확히 5초 동안 실행되다 실패(FAILED)한 Job 상황 연출
         JobExecution jobExecution = mock(JobExecution.class);
         JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
-        LocalDateTime start = LocalDateTime.now().minusSeconds(5);
-        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = LocalDateTime.of(2026, 11, 2, 0, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 11, 2, 0, 0, 5);
 
         given(jobExecution.getJobInstance()).willReturn(jobInstance);
         given(jobExecution.getStatus()).willReturn(BatchStatus.FAILED);
         given(jobExecution.getStartTime()).willReturn(start);
         given(jobExecution.getEndTime()).willReturn(end);
 
-        // when: 리스너의 afterJob 실행
+        // when
         batchMetricsListener.afterJob(jobExecution);
 
-        // then: 소요 시간 타이머가 1회 작동했고, 실패 카운터가 1 올라갔는지 확인
+        // then: 타이머 작동 횟수(1회), 총 소요 시간(5초), 실패 카운터(1건) 검증
         Timer timer = meterRegistry
                 .find(BatchMetrics.DURATION_METRIC)
                 .tag("job", "articleCollectJob")
@@ -104,14 +102,81 @@ class BatchMetricsTest {
 
         assertThat(timer).isNotNull();
         assertThat(timer.count()).isEqualTo(1L);
+        assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(5.0);
         assertThat(failedCounter).isNotNull();
         assertThat(failedCounter.count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("Step 종료 시 리스너를 통해 수집 건수와 실패 건수가 기록된다")
+    @DisplayName("Job이 COMPLETED 상태로 종료되면 소요 시간만 기록되고 실패 건수는 증가하지 않는다")
+    void afterJobCompletedRecordsOnlyDuration() {
+        // given: 정확히 4초 동안 실행되고 성공(COMPLETED)한 Job 상황 연출
+        JobExecution jobExecution = mock(JobExecution.class);
+        JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
+        LocalDateTime start = LocalDateTime.of(2026, 11, 2, 0, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 11, 2, 0, 0, 4);
+
+        given(jobExecution.getJobInstance()).willReturn(jobInstance);
+        given(jobExecution.getStatus()).willReturn(BatchStatus.COMPLETED);
+        given(jobExecution.getStartTime()).willReturn(start);
+        given(jobExecution.getEndTime()).willReturn(end);
+
+        // when
+        batchMetricsListener.afterJob(jobExecution);
+
+        // then: COMPLETED 타이머는 4초로 기록되고, 실패 카운터는 생성·증가하지 않음
+        Timer timer = meterRegistry
+                .find(BatchMetrics.DURATION_METRIC)
+                .tag("job", "articleCollectJob")
+                .tag("status", "COMPLETED")
+                .timer();
+        Counter failedCounter = meterRegistry
+                .find(BatchMetrics.FAILED_COUNT_METRIC)
+                .tag("job", "articleCollectJob")
+                .counter();
+
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1L);
+        assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(4.0);
+        assertThat(failedCounter).isNull();
+    }
+
+    @Test
+    @DisplayName("Job 종료 시각이 없으면 소요 시간 타이머는 기록하지 않고 실패 건수만 기록한다")
+    void afterJobWithoutEndTimeRecordsOnlyFailure() {
+        // given: 종료 시각(endTime)이 null인 상태에서 FAILED된 경계값 연출
+        JobExecution jobExecution = mock(JobExecution.class);
+        JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
+        LocalDateTime start = LocalDateTime.of(2026, 11, 2, 0, 0, 0);
+
+        given(jobExecution.getJobInstance()).willReturn(jobInstance);
+        given(jobExecution.getStatus()).willReturn(BatchStatus.FAILED);
+        given(jobExecution.getStartTime()).willReturn(start);
+        given(jobExecution.getEndTime()).willReturn(null);
+
+        // when
+        batchMetricsListener.afterJob(jobExecution);
+
+        // then: 타이머는 기록되지 않고(null), 실패 건수만 1 증가함
+        Timer timer = meterRegistry
+                .find(BatchMetrics.DURATION_METRIC)
+                .tag("job", "articleCollectJob")
+                .tag("status", "FAILED")
+                .timer();
+        Counter failedCounter = meterRegistry
+                .find(BatchMetrics.FAILED_COUNT_METRIC)
+                .tag("job", "articleCollectJob")
+                .counter();
+
+        assertThat(timer).isNull();
+        assertThat(failedCounter).isNotNull();
+        assertThat(failedCounter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("Step 종료 시 리스너를 통해 수집 건수와 스킵 기반 실패 건수(예외 제외)가 기록된다")
     void afterStepRecordsCollectedAndFailedCounts() {
-        // given: 20건 저장 성공하고, 스킵 3건(읽기 1 + 처리 1 + 쓰기 1) 및 예외 1건이 발생한 가짜 Step 상황 연출
+        // given: 20건 저장 성공하고, 스킵 3건(읽기 1 + 처리 1 + 쓰기 1)이 발생한 가짜 Step 상황 연출
         StepExecution stepExecution = mock(StepExecution.class);
         JobExecution jobExecution = mock(JobExecution.class);
         JobInstance jobInstance = new JobInstance(1L, "articleCollectJob");
@@ -122,13 +187,12 @@ class BatchMetricsTest {
         given(stepExecution.getReadSkipCount()).willReturn(1L);
         given(stepExecution.getProcessSkipCount()).willReturn(1L);
         given(stepExecution.getWriteSkipCount()).willReturn(1L);
-        given(stepExecution.getFailureExceptions()).willReturn(List.of(new RuntimeException("error")));
         given(stepExecution.getExitStatus()).willReturn(ExitStatus.COMPLETED);
 
         // when: 리스너의 afterStep 실행
         ExitStatus exitStatus = batchMetricsListener.afterStep(stepExecution);
 
-        // then: 수집 20건, 실패 3건이 정확히 기록되었는지 확인(Step 예외 1건은 제외)
+        // then: 수집 20건과 스킵 3건만 실패 건수로 기록되었는지 확인 (Step 예외 1건은 제외)
         Counter collectedCounter = meterRegistry
                 .find(BatchMetrics.COLLECTED_COUNT_METRIC)
                 .tag("job", "articleCollectJob")
