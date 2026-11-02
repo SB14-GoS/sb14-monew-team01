@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
@@ -61,6 +62,16 @@ public class NaverNewsClient implements NewsSourceClient {
                 }
 
                 for (NaverNewsItem item : response.items()) {
+                    /* 오리지널 링크 없으면 일반 링크로 대체 */
+                    String originallink = item.originallink();
+                    if (Objects.isNull(originallink) || originallink.isBlank()) {
+                        originallink = item.link();
+                    }
+                    /* 일반링크로 대체한게 또 없으면 그냥 수집 X */
+                    if (Objects.isNull(originallink) || originallink.isBlank()) {
+                        log.warn("링크 누락 기사 제외 - title: {}", item.title());
+                        continue;
+                    }
                     /* 응답이 이런식으로 오기떄문에 걸러줘야함 html 태그 제거해줘야함
                     "title":"국감장서 '<b>북한<\/b> 지뢰' 꺼내든 박충권 &quot;장관 앞에 놔도 되냐&quot;…정동영 &quot;사...",
                     "description":"<b>북한<\/b>의 지뢰를 정동영 장관....회 외교통일위원회 종합국정감사장에 <b>북한<\/b>... ",
@@ -74,7 +85,7 @@ public class NaverNewsClient implements NewsSourceClient {
 
                     RawArticle article = new RawArticle(
                             ArticleSource.NAVER,
-                            item.originallink(),
+                            originallink,
                             title,
                             ZonedDateTime.parse(item.pubDate(), DateTimeFormatter.RFC_1123_DATE_TIME)
                                     .toInstant(),
