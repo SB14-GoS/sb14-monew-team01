@@ -1,7 +1,7 @@
 package com.sprint.monew.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -52,10 +52,13 @@ class NotificationCleanupSchedulerTest {
     }
 
     @Test
-    @DisplayName("배치 실행 실패가 스케줄러 밖으로 전파되지 않는다")
-    void handlesJobFailure() throws Exception {
-        doThrow(new IllegalStateException("failure")).when(jobOperator).start(eq(cleanupJob), any(JobParameters.class));
-        assertThatCode(() -> new NotificationCleanupScheduler(jobOperator, cleanupJob).cleanupNotifications())
-                .doesNotThrowAnyException();
+    @DisplayName("배치 시작 실패를 원인과 함께 스케줄러 밖으로 전파한다")
+    void propagatesJobStartFailure() throws Exception {
+        var cause = new IllegalStateException("failure");
+        doThrow(cause).when(jobOperator).start(eq(cleanupJob), any(JobParameters.class));
+        assertThatThrownBy(() -> new NotificationCleanupScheduler(jobOperator, cleanupJob).cleanupNotifications())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("알림 정리 배치 실행 실패")
+                .hasCause(cause);
     }
 }
