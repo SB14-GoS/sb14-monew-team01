@@ -55,12 +55,16 @@ class NotificationCleanupSchedulerTest {
 
     @Test
     @ExtendWith(OutputCaptureExtension.class)
-    @DisplayName("배치 시작 실패를 로그에 기록하고 예외를 전파하지 않는다")
+    @DisplayName("배치 시작 실패 시 요청 시각과 예외를 로그에 기록하고 예외를 전파하지 않는다")
     void logsJobStartFailure(CapturedOutput output) throws Exception {
         var cause = new IllegalStateException("failure");
         doThrow(cause).when(jobOperator).start(eq(cleanupJob), any(JobParameters.class));
         assertThatCode(() -> new NotificationCleanupScheduler(jobOperator, cleanupJob).cleanupNotifications())
                 .doesNotThrowAnyException();
-        assertThat(output).contains("알림 정리 배치 실행 실패", "java.lang.IllegalStateException: failure");
+        ArgumentCaptor<JobParameters> parameters = ArgumentCaptor.forClass(JobParameters.class);
+        verify(jobOperator).start(eq(cleanupJob), parameters.capture());
+        String requestedAt = parameters.getValue().getString("requestedAt");
+        assertThat(output)
+                .contains("알림 정리 배치 실행 실패: requestedAt=" + requestedAt, "java.lang.IllegalStateException: failure");
     }
 }
