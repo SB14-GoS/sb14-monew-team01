@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -59,9 +60,12 @@ public class ArticleCollectService {
         /* 가져온 Rss 한번에 키워드 포함되는지 검사
          * 검사 통과된 아이들만 최종 결과에 포함 */
         for (RawArticle article : rssTotalResult) {
+            String title = article.title().toLowerCase(Locale.ROOT);
+            String summary = article.summary().toLowerCase(Locale.ROOT);
             for (String keyword : keywords) {
-                boolean titleMatched = article.title().contains(keyword);
-                boolean summaryMatched = article.summary().contains(keyword);
+                String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
+                boolean titleMatched = title.contains(lowerKeyword);
+                boolean summaryMatched = summary.contains(lowerKeyword);
 
                 if (titleMatched || summaryMatched) {
                     totalResult.add(article);
@@ -92,7 +96,6 @@ public class ArticleCollectService {
                 if (newArticle) {
                     article = Article.create(
                             each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
-                    result.add(article);
                 } else {
                     /* 기사가 있으면 기사객체 꺼냄 */
                     article = existingArticle.get();
@@ -105,12 +108,17 @@ public class ArticleCollectService {
                 /* 가져온 관심사, 키워드 매핑정보들
                  * 기사들의 제목이랑 내용에 포함되는 확인,
                  * 포함되면 관심사 매핑하여 저장 */
+                String title = each.title().toLowerCase(Locale.ROOT);
+                String summary = each.summary().toLowerCase(Locale.ROOT);
+                boolean mapped = false;
                 for (InterestKeywordInfo interest : keywordInfos) {
                     for (String keyword : interest.keywords()) {
-                        boolean titleMatched = each.title().contains(keyword);
-                        boolean summaryMatched = each.summary().contains(keyword);
+                        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
+                        boolean titleMatched = title.contains(lowerKeyword);
+                        boolean summaryMatched = summary.contains(lowerKeyword);
 
                         if (titleMatched || summaryMatched) {
+                            mapped = true;
                             /* 신규 기사이거나, 관심사 매핑이 없을때 */
                             if (newArticle
                                     || !articleInterestRepository.existsByArticle_IdAndInterestId(
@@ -125,6 +133,10 @@ public class ArticleCollectService {
                             break;
                         }
                     }
+                }
+                /* 관심사 키워드가 하나라도 매칭된 신규 기사만 저장 */
+                if (newArticle && mapped) {
+                    result.add(article);
                 }
             }
         }
