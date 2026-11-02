@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,8 +43,10 @@ public class ArticleCollectService {
     /* 배치로 돌릴거 */
     public void save() {
         log.info("기사 수집 및 저장 요청: NAVER, CHOSUN, HANKUNG, YEONHAP");
+        List<InterestKeywordInfo> keywordInfos = interestQueryApi.getAllKeywords();
+
         /* 관심사 db 다 가져와서 키워드 기준 중복제거하고 키워드 리스트로 반환 */
-        Set<String> keywords = interestQueryApi.getAllKeywords().stream()
+        Set<String> keywords = keywordInfos.stream()
                 .flatMap(keyword -> keyword.keywords().stream())
                 .collect(Collectors.toSet());
 
@@ -74,31 +77,52 @@ public class ArticleCollectService {
         List<Article> result = new ArrayList<>();
         /* db에 저장된 관심사를 새로 불러온 기사랑 매핑해놓은 리스트 */
         List<ArticleInterest> mappingResult = new ArrayList<>();
+        Map<UUID, Long> articleCounts = new HashMap<>();
 
         /* 받아온 기사를 기사 객체로 바꾸고, db에 저장하는 로직
          * 기사가 어떠한 관심사에 매핑되는지도 관심사-기사 매핑 테이블에 저장 */
         for (RawArticle each : totalResult) {
             /* 반환이 boolean Set에 새로 추가되면 true 추가가 안되면 false */
             if (sourceUrl.add(each.sourceUrl())) {
-                /* db 조회해서 이미 원본링크 있으면 저장 안함 */
-                if (articleRepository.findBySourceUrl(each.sourceUrl()).isEmpty()) {
-                    Article article = Article.create(
+                Optional<Article> existingArticle = articleRepository.findBySourceUrl(each.sourceUrl());
+                boolean newArticle = existingArticle.isEmpty();
+                Article article;
+
+                /* 비어 있으면 새로운 기사객체 생성 */
+                if (newArticle) {
+                    article = Article.create(
                             each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
                     result.add(article);
+                } else {
+                    /* 기사가 있으면 기사객체 꺼냄 */
+                    article = existingArticle.get();
+                    /* 그리고 논리삭제 됐는지 검사, 논리 삭제면 처음으로 돌아감*/
+                    if (article.isDeleted()) {
+                        continue;
+                    }
+                }
 
-                    /* 가져온 관심사, 키워드 매핑정보들
-                     * 기사들의 제목이랑 내용에 포함되는 확인,
-                     * 포함되면 관심사 매핑하여 저장 */
-                    List<InterestKeywordInfo> list = interestQueryApi.getAllKeywords();
-                    for (InterestKeywordInfo interest : list) {
-                        for (String keyword : interest.keywords()) {
-                            boolean titleMatched = each.title().contains(keyword);
-                            boolean summaryMatched = each.summary().contains(keyword);
+                /* 가져온 관심사, 키워드 매핑정보들
+                 * 기사들의 제목이랑 내용에 포함되는 확인,
+                 * 포함되면 관심사 매핑하여 저장 */
+                for (InterestKeywordInfo interest : keywordInfos) {
+                    for (String keyword : interest.keywords()) {
+                        boolean titleMatched = each.title().contains(keyword);
+                        boolean summaryMatched = each.summary().contains(keyword);
 
-                            if (titleMatched || summaryMatched) {
+                        if (titleMatched || summaryMatched) {
+                            /* 신규 기사이거나, 관심사 매핑이 없을때 */
+                            if (newArticle
+                                    || !articleInterestRepository.existsByArticle_IdAndInterestId(
+                                            article.getId(), interest.interestId())) {
                                 mappingResult.add(ArticleInterest.create(article, interest.interestId()));
-                                break;
+                                if (newArticle) {
+                                    UUID interestId = interest.interestId();
+                                    long count = articleCounts.getOrDefault(interestId, 0L);
+                                    articleCounts.put(interestId, count + 1);
+                                }
                             }
+                            break;
                         }
                     }
                 }
@@ -108,15 +132,7 @@ public class ArticleCollectService {
         articleRepository.saveAll(result);
         articleInterestRepository.saveAll(mappingResult);
 
-        Map<UUID, Long> articleCounts = new HashMap<>();
-
-        for (ArticleInterest mapping : mappingResult) {
-            UUID interestId = mapping.getInterestId();
-            long count = articleCounts.getOrDefault(interestId, 0L);
-            articleCounts.put(interestId, count + 1);
-        }
-
-        for (InterestKeywordInfo interest : interestQueryApi.getAllKeywords()) {
+        for (InterestKeywordInfo interest : keywordInfos) {
             long count = articleCounts.getOrDefault(interest.interestId(), 0L);
 
             if (count > 0) {
