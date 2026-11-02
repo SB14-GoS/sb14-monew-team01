@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ArticleInterestRepository extends JpaRepository<ArticleInterest, UUID> {
+
+    boolean existsByArticle_IdAndInterestId(UUID articleId, UUID interestId);
+
     @Modifying
     @Query("delete from ArticleInterest a where a.article.id = :articleId")
     void deleteArticleInterestsByArticleId(@Param("articleId") UUID articleId);
