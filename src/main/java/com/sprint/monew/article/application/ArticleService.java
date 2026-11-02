@@ -2,6 +2,7 @@ package com.sprint.monew.article.application;
 
 import com.sprint.monew.article.api.ArticleCleanupApi;
 import com.sprint.monew.article.api.ArticleCommandApi;
+import com.sprint.monew.article.api.ArticleDeleteEvent;
 import com.sprint.monew.article.api.ArticleQueryApi;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleOrderBy;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,7 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     private final ArticleRepository articleRepository;
     private final ArticleInterestRepository articleInterestRepository;
     private final ArticleCleanupApi articleCleanupApi;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public ArticleDto read(UUID articleId, UUID userId) {
@@ -115,8 +118,9 @@ public class ArticleService implements ArticleQueryApi, ArticleCommandApi {
     public void deleteHard(UUID articleId) {
         Article target =
                 articleRepository.findById(articleId).orElseThrow(() -> new ArticleNotFoundException(articleId));
-        // 다른 도메인 호출해서 삭제하기 댓글
-        articleCleanupApi.deleteAllByArticleId(target.getId());
+
+        /* 기사하기전 이벤트 발행 */
+        eventPublisher.publishEvent(new ArticleDeleteEvent(target.getId()));
 
         /* 얘네까지가 기사 도메인에서 삭제 가능한얘들 */
         articleViewRepository.deleteArticleViewsByArticleId(target.getId());
