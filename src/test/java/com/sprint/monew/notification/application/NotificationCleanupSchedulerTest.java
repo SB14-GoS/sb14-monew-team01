@@ -1,7 +1,7 @@
 package com.sprint.monew.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -17,6 +17,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.launch.JobOperator;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,13 +54,13 @@ class NotificationCleanupSchedulerTest {
     }
 
     @Test
-    @DisplayName("배치 시작 실패를 원인과 함께 스케줄러 밖으로 전파한다")
-    void propagatesJobStartFailure() throws Exception {
+    @ExtendWith(OutputCaptureExtension.class)
+    @DisplayName("배치 시작 실패를 로그에 기록하고 예외를 전파하지 않는다")
+    void logsJobStartFailure(CapturedOutput output) throws Exception {
         var cause = new IllegalStateException("failure");
         doThrow(cause).when(jobOperator).start(eq(cleanupJob), any(JobParameters.class));
-        assertThatThrownBy(() -> new NotificationCleanupScheduler(jobOperator, cleanupJob).cleanupNotifications())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("알림 정리 배치 실행 실패")
-                .hasCause(cause);
+        assertThatCode(() -> new NotificationCleanupScheduler(jobOperator, cleanupJob).cleanupNotifications())
+                .doesNotThrowAnyException();
+        assertThat(output).contains("알림 정리 배치 실행 실패", "java.lang.IllegalStateException: failure");
     }
 }

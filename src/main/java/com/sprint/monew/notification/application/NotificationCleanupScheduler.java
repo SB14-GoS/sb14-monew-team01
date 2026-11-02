@@ -27,7 +27,7 @@ public class NotificationCleanupScheduler {
         try {
             jobOperator.start(notificationCleanupJob, parameters);
         } catch (Exception exception) {
-            log.error("알림 정리 배치 실행 실패", exception);
+            log.error("알림 정리 배치 실행 실패", Instant.now(), exception);
         }
     }
 
