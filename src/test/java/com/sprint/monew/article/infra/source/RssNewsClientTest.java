@@ -7,6 +7,7 @@ import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.sprint.monew.article.application.port.RawArticle;
@@ -24,9 +25,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 class RssNewsClientTest {
 
@@ -35,7 +38,7 @@ class RssNewsClientTest {
     private static final String PUB_DATE = "Wed, 28 Oct 2026 15:34:44 +0900";
 
     private final RestClient restClient = mock(RestClient.class, RETURNS_DEEP_STUBS);
-    private final RssNewsClient client = new RssNewsClient(ArticleSource.HANKYUNG, FEED_URL, restClient);
+    private final RssNewsClient client = new RssNewsClient(ArticleSource.HANKYUNG, List.of(FEED_URL), restClient);
 
     @ParameterizedTest
     @MethodSource("invalidResponses")
@@ -132,7 +135,7 @@ class RssNewsClientTest {
                 </rss>
                 """;
         server.expect(requestTo(FEED_URL)).andRespond(withSuccess(xml, MediaType.parseMediaType(contentType)));
-        RssNewsClient xmlClient = new RssNewsClient(ArticleSource.HANKYUNG, FEED_URL, builder.build());
+        RssNewsClient xmlClient = new RssNewsClient(ArticleSource.HANKYUNG, List.of(FEED_URL), builder.build());
 
         assertThat(xmlClient.fetch(List.of()))
                 .containsExactly(
@@ -149,6 +152,72 @@ class RssNewsClientTest {
                                 Instant.parse("2026-10-28T06:34:44Z"),
                                 "시장 & 전망"));
         server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http-error", "invalid-xml", "invalid-date"})
+    void keepsSuccessfulFeedsAndContinuesAfterAFailedFeed(String failure) {
+        RestClient.Builder builder = new RssNewsClientConfig().rssRestClient().mutate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(FEED_URL)).andRespond(withSuccess(feedXml(ARTICLE_URL), MediaType.APPLICATION_XML));
+        if (failure.equals("http-error")) {
+            server.expect(requestTo(FEED_URL + "/failed")).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        } else {
+            String invalidBody = failure.equals("invalid-xml")
+                    ? "<rss><channel>"
+                    : feedXml(ARTICLE_URL).replace(PUB_DATE, "invalid-date");
+            server.expect(requestTo(FEED_URL + "/failed"))
+                    .andRespond(withSuccess(invalidBody, MediaType.APPLICATION_XML));
+        }
+        server.expect(requestTo(FEED_URL + "/empty"))
+                .andRespond(withSuccess("<rss><channel/></rss>", MediaType.APPLICATION_XML));
+        server.expect(requestTo(FEED_URL + "/next"))
+                .andRespond(withSuccess(feedXml(ARTICLE_URL + "2"), MediaType.APPLICATION_XML));
+        RssNewsClient multiFeedClient = new RssNewsClient(
+                ArticleSource.HANKYUNG,
+                List.of(FEED_URL, FEED_URL + "/failed", FEED_URL + "/empty", FEED_URL + "/next"),
+                builder.build());
+
+        assertThat(multiFeedClient.fetch(List.of("경제")))
+                .extracting(RawArticle::sourceUrl)
+                .containsExactly(ARTICLE_URL, ARTICLE_URL + "2");
+        server.verify();
+    }
+
+    @Test
+    void propagatesFailureWhenAllFeedsFail() {
+        RestClient.Builder builder = new RssNewsClientConfig().rssRestClient().mutate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(FEED_URL)).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        server.expect(requestTo(FEED_URL + "/next")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        RssNewsClient multiFeedClient =
+                new RssNewsClient(ArticleSource.HANKYUNG, List.of(FEED_URL, FEED_URL + "/next"), builder.build());
+
+        assertThatThrownBy(() -> multiFeedClient.fetch(List.of())).isInstanceOf(RestClientResponseException.class);
+        server.verify();
+    }
+
+    @Test
+    void returnsEmptyWhenOneFeedIsEmptyAndAnotherFails() {
+        RestClient.Builder builder = new RssNewsClientConfig().rssRestClient().mutate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(FEED_URL)).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        server.expect(requestTo(FEED_URL + "/empty"))
+                .andRespond(withSuccess("<rss><channel/></rss>", MediaType.APPLICATION_XML));
+        RssNewsClient multiFeedClient =
+                new RssNewsClient(ArticleSource.HANKYUNG, List.of(FEED_URL, FEED_URL + "/empty"), builder.build());
+
+        assertThat(multiFeedClient.fetch(List.of())).isEmpty();
+        server.verify();
+    }
+
+    private static String feedXml(String articleUrl) {
+        return """
+                <rss><channel><item>
+                  <title>경제 소식</title><link>%s</link>
+                  <pubDate>%s</pubDate>
+                </item></channel></rss>
+                """.formatted(articleUrl, PUB_DATE);
     }
 
     @ParameterizedTest

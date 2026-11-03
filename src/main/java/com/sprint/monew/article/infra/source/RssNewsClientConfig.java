@@ -3,13 +3,14 @@ package com.sprint.monew.article.infra.source;
 import com.sprint.monew.article.domain.ArticleSource;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(RssProperties.class)
 public class RssNewsClientConfig {
 
     @Bean
@@ -26,19 +27,18 @@ public class RssNewsClientConfig {
 
     @Bean
     public RssNewsClient hankyungNewsClient(
-            @Value("${news.rss.hankyung-url}") String feedUrl, @Qualifier("rssRestClient") RestClient restClient) {
-        return new RssNewsClient(ArticleSource.HANKYUNG, feedUrl, restClient);
+            RssProperties properties, @Qualifier("rssRestClient") RestClient restClient) {
+        return new RssNewsClient(ArticleSource.HANKYUNG, properties.hankyungUrls(), restClient);
     }
 
     @Bean
-    public RssNewsClient chosunNewsClient(
-            @Value("${news.rss.chosun-url}") String feedUrl, @Qualifier("rssRestClient") RestClient restClient) {
-        return new RssNewsClient(ArticleSource.CHOSUN, feedUrl, restClient);
+    public RssNewsClient chosunNewsClient(RssProperties properties, @Qualifier("rssRestClient") RestClient restClient) {
+        return new RssNewsClient(ArticleSource.CHOSUN, properties.chosunUrls(), restClient);
     }
 
     @Bean
     public RssNewsClient yeonhapNewsClient(
-            @Value("${news.rss.yeonhap-url}") String feedUrl, @Qualifier("rssRestClient") RestClient restClient) {
-        return new RssNewsClient(ArticleSource.YEONHAP, feedUrl, restClient);
+            RssProperties properties, @Qualifier("rssRestClient") RestClient restClient) {
+        return new RssNewsClient(ArticleSource.YEONHAP, properties.yeonhapUrls(), restClient);
     }
 }
