@@ -6,7 +6,6 @@ import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.exception.InvalidNaverNewsResponseException;
 import com.sprint.monew.article.infra.source.dto.NaverNewsItem;
 import com.sprint.monew.article.infra.source.dto.NaverNewsResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -15,8 +14,6 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.event.Level;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -37,21 +34,16 @@ public class NaverNewsClient implements NewsSourceClient {
     public List<RawArticle> fetch(Collection<String> keywords) {
         List<RawArticle> result = new ArrayList<>();
         for (String keyword : keywords) {
-            log.info("네이버 뉴스 수집 요청 - keyword: {}", keyword);
-            StringBuilder responseBody = new StringBuilder();
+            log.debug("네이버 뉴스 수집 요청 - keyword: {}", keyword);
             try {
                 NaverNewsResponse response = restClient
                         .get()
                         .uri("/search/v1/news?query={keyword}&display=100" + "&sort=date&format=json", keyword)
                         .retrieve()
-                        .onStatus(status -> true, (request, httpResponse) -> {
-                            responseBody.append(
-                                    StreamUtils.copyToString(httpResponse.getBody(), StandardCharsets.UTF_8));
-                            if (httpResponse.getStatusCode().isError()) {
-                                new DefaultResponseErrorHandler()
-                                        .handleError(request.getURI(), request.getMethod(), httpResponse);
-                            }
-                        })
+                        .onStatus(
+                                status -> status.isError(),
+                                (request, httpResponse) -> new DefaultResponseErrorHandler()
+                                        .handleError(request.getURI(), request.getMethod(), httpResponse))
                         .body(NaverNewsResponse.class);
 
                 if (response == null) {
@@ -93,16 +85,14 @@ public class NaverNewsClient implements NewsSourceClient {
                     result.add(article);
                 }
             } catch (RuntimeException e) {
-                Level level = e instanceof RestClientResponseException httpException
-                                && httpException.getStatusCode().is4xxClientError()
-                        ? Level.WARN
-                        : Level.ERROR;
-                log.atLevel(level)
-                        .log(
-                                "네이버 뉴스 수집 요청 처리 실패 - keyword: {}, response: {}, exception: {}",
-                                keyword,
-                                responseBody,
-                                e.toString());
+                String status = e instanceof RestClientResponseException httpException
+                        ? httpException.getStatusCode().toString()
+                        : "-";
+                log.warn(
+                        "네이버 뉴스 수집 실패 - source: NAVER, keyword: {}, status: {}, error: {}",
+                        keyword,
+                        status,
+                        e.getClass().getSimpleName());
                 throw e;
             }
         }
