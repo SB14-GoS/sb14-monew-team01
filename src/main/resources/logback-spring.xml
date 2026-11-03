@@ -24,7 +24,7 @@
     <!-- 자정이 지나면 monew.2026-11-02.log 형태로 파일명을 변경하여 마감 -->
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
       <fileNamePattern>${LOG_DIR}/monew.%d{yyyy-MM-dd,Asia/Seoul}.log</fileNamePattern>
-      <!-- 서버 디스크 용량 관리를 위해 최근 7일 치 파일만 보관 -->
+      <!-- 서버 디스크 용량 관리를 위해 최근 14일 치 파일만 보관 -->
       <maxHistory>14</maxHistory>
     </rollingPolicy>
   </appender>
