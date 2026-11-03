@@ -39,6 +39,42 @@ monew:
 
 news:
   rss:
-    hankyung-url: https://www.hankyung.com/feed/all-news
-    chosun-url: https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml
-    yeonhap-url: https://www.yna.co.kr/rss/news.xml
+    hankyung-urls:
+      - https://www.hankyung.com/feed/all-news
+      - https://www.hankyung.com/feed/economy
+      - https://www.hankyung.com/feed/it
+      - https://www.hankyung.com/feed/international
+      - https://www.hankyung.com/feed/life
+      - https://www.hankyung.com/feed/sports
+      - https://www.hankyung.com/feed/finance
+      - https://www.hankyung.com/feed/realestate
+      - https://www.hankyung.com/feed/politics
+      - https://www.hankyung.com/feed/society
+      - https://www.hankyung.com/feed/opinion
+      - https://www.hankyung.com/feed/entertainment
+    chosun-urls:
+      - https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/economy/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/national/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/culture-life/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/opinion/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml
+      - https://www.chosun.com/arc/outboundfeeds/rss/category/entertainments/?outputType=xml
+    yeonhap-urls:
+      - https://www.yna.co.kr/rss/news.xml
+      - https://www.yna.co.kr/rss/politics.xml
+      - https://www.yna.co.kr/rss/northkorea.xml
+      - https://www.yna.co.kr/rss/economy.xml
+      - https://www.yna.co.kr/rss/market.xml
+      - https://www.yna.co.kr/rss/industry.xml
+      - https://www.yna.co.kr/rss/society.xml
+      - https://www.yna.co.kr/rss/local.xml
+      - https://www.yna.co.kr/rss/international.xml
+      - https://www.yna.co.kr/rss/culture.xml
+      - https://www.yna.co.kr/rss/health.xml
+      - https://www.yna.co.kr/rss/entertainment.xml
+      - https://www.yna.co.kr/rss/sports.xml
+      - https://www.yna.co.kr/rss/opinion.xml
+      - https://www.yna.co.kr/rss/people.xml

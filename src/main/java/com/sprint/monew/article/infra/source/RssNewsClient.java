@@ -26,7 +26,7 @@ import org.springframework.web.util.HtmlUtils;
 public class RssNewsClient implements NewsSourceClient {
 
     private final ArticleSource source;
-    private final String feedUrl;
+    private final List<String> feedUrls;
     private final RestClient restClient;
 
     @Override
@@ -36,6 +36,25 @@ public class RssNewsClient implements NewsSourceClient {
 
     @Override
     public List<RawArticle> fetch(Collection<String> keywords) {
+        List<RawArticle> result = new ArrayList<>();
+        RuntimeException lastFailure = null;
+        boolean fetched = false;
+        for (String feedUrl : feedUrls) {
+            try {
+                result.addAll(fetchFeed(feedUrl));
+                fetched = true;
+            } catch (RuntimeException e) {
+                // 한 피드가 실패해도 다른 분야의 기사는 계속 수집한다.
+                lastFailure = e;
+            }
+        }
+        if (!fetched && lastFailure != null) {
+            throw lastFailure;
+        }
+        return result;
+    }
+
+    private List<RawArticle> fetchFeed(String feedUrl) {
         log.info("RSS 뉴스 수집 요청 - source: {}, url: {}", source, feedUrl);
         List<RawArticle> result = new ArrayList<>();
 
@@ -88,8 +107,9 @@ public class RssNewsClient implements NewsSourceClient {
                     : Level.ERROR;
             log.atLevel(level)
                     .log(
-                            "RSS 뉴스 수집 요청 처리 실패 - source: {}, response: {}, exception: {}",
+                            "RSS 뉴스 수집 요청 처리 실패 - source: {}, url: {}, response: {}, exception: {}",
                             source,
+                            feedUrl,
                             responseBody,
                             e.toString());
             throw e;

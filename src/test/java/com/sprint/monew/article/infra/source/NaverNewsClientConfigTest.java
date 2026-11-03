@@ -17,9 +17,9 @@ class NaverNewsClientConfigTest {
                 .withPropertyValues(
                         "news.naver.client-id=test-id",
                         "news.naver.client-secret=test-secret",
-                        "news.rss.hankyung-url=https://rss.example/hankyung",
-                        "news.rss.chosun-url=https://rss.example/chosun",
-                        "news.rss.yeonhap-url=https://rss.example/yeonhap")
+                        "news.rss.hankyung-urls[0]=https://rss.example/hankyung",
+                        "news.rss.chosun-urls[0]=https://rss.example/chosun",
+                        "news.rss.yeonhap-urls[0]=https://rss.example/yeonhap")
                 .run(context -> {
                     assertThat(context).hasNotFailed().hasSingleBean(NaverNewsClient.class);
                     assertThat(context.getBeansOfType(NewsSourceClient.class))
