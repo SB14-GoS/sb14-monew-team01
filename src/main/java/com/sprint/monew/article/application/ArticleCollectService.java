@@ -51,11 +51,31 @@ public class ArticleCollectService {
                 .flatMap(keyword -> keyword.keywords().stream())
                 .collect(Collectors.toSet());
 
-        List<RawArticle> totalResult = naverNewsClient.fetch(keywords);
+        List<RawArticle> totalResult = new ArrayList<>();
+        try {
+            totalResult.addAll(naverNewsClient.fetch(keywords));
+        } catch (RuntimeException e) {
+            log.error("네이버 기사 수집 실패", e);
+        }
 
-        List<RawArticle> rssTotalResult = new ArrayList<>(chosunNewsClient.fetch(keywords));
-        rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
-        rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
+        List<RawArticle> rssTotalResult = new ArrayList<>();
+        try {
+            rssTotalResult.addAll(chosunNewsClient.fetch(keywords));
+        } catch (RuntimeException e) {
+            log.error("조선뉴스 기사 수집 실패", e);
+        }
+
+        try {
+            rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
+        } catch (RuntimeException e) {
+            log.error("연합뉴스 기사 수집 실패", e);
+        }
+
+        try {
+            rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
+        } catch (RuntimeException e) {
+            log.error("한경뉴스 기사 수집 실패", e);
+        }
 
         /* 가져온 Rss 한번에 키워드 포함되는지 검사
          * 검사 통과된 아이들만 최종 결과에 포함 */
