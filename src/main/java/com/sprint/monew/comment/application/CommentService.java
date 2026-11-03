@@ -134,7 +134,8 @@ public class CommentService {
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(() -> new CommentNotFoundException(commentId));
 
-        if (!comment.getUserId().equals(requesterUserId)) {
+        // 요청자 헤더가 있을 때만 본인 확인 (명세상 헤더 없음)
+        if (requesterUserId != null && !comment.getUserId().equals(requesterUserId)) {
             throw new CommentAccessDeniedException(commentId, requesterUserId);
         }
 
@@ -151,7 +152,8 @@ public class CommentService {
         Comment comment =
                 commentRepository.findById(commentId).orElseThrow(() -> new CommentNotFoundException(commentId));
 
-        if (!comment.getUserId().equals(requesterUserId)) {
+        // 요청자 헤더가 있을 때만 본인 확인 (명세상 헤더 없음)
+        if (requesterUserId != null && !comment.getUserId().equals(requesterUserId)) {
             throw new CommentAccessDeniedException(commentId, requesterUserId);
         }
 

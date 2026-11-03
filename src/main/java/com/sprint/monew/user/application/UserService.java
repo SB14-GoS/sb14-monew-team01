@@ -78,7 +78,8 @@ public class UserService implements UserQueryApi {
 
     @Transactional
     public UserDto updateNickname(UUID userId, UUID requesterId, UserUpdateRequest request) {
-        if (!userId.equals(requesterId)) {
+        // 요청자 헤더가 있을 때만 본인 확인 (명세상 헤더 없음)
+        if (requesterId != null && !userId.equals(requesterId)) {
             throw new UserUpdateForbiddenException(userId);
         }
         User user = userRepository
@@ -92,7 +93,8 @@ public class UserService implements UserQueryApi {
 
     @Transactional
     public void softDelete(UUID userId, UUID requesterId) {
-        if (!userId.equals(requesterId)) {
+        // 요청자 헤더가 있을 때만 본인 확인 (명세상 헤더 없음)
+        if (requesterId != null && !userId.equals(requesterId)) {
             throw new UserDeleteForbiddenException(userId);
         }
         User user = userRepository
@@ -104,7 +106,8 @@ public class UserService implements UserQueryApi {
 
     @Transactional
     public void hardDelete(UUID userId, UUID requesterId) {
-        if (!userId.equals(requesterId)) {
+        // 요청자 헤더가 있을 때만 본인 확인 (명세상 헤더 없음)
+        if (requesterId != null && !userId.equals(requesterId)) {
             throw new UserDeleteForbiddenException(userId);
         }
         User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
