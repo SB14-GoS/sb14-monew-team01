@@ -33,6 +33,10 @@ logging:
 springdoc:
   paths-to-match: /api/**
 
+monew:
+  article-collect:
+    cron: "0 0 * * * *"
+
 news:
   rss:
     hankyung-url: https://www.hankyung.com/feed/all-news
