@@ -9,6 +9,7 @@ import io.swagger.v3.oas.models.parameters.HeaderParameter;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.context.annotation.Bean;
@@ -38,16 +39,15 @@ public class OpenApiConfig {
     @Bean
     public OperationCustomizer requestUserIdHeaderCustomizer() {
         return (operation, handlerMethod) -> {
-            boolean usesRequestUserId = Arrays.stream(handlerMethod.getMethodParameters())
-                    .anyMatch(parameter -> parameter.hasParameterAnnotation(RequestUserId.class));
-
-            if (usesRequestUserId) {
-                operation.addParametersItem(new HeaderParameter()
-                        .name(RequestTraceConstants.USER_ID_HEADER)
-                        .description("요청자 ID")
-                        .required(true)
-                        .schema(new UUIDSchema()));
-            }
+            Arrays.stream(handlerMethod.getMethodParameters())
+                    .map(parameter -> parameter.getParameterAnnotation(RequestUserId.class))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .ifPresent(requestUserId -> operation.addParametersItem(new HeaderParameter()
+                            .name(RequestTraceConstants.USER_ID_HEADER)
+                            .description("요청자 ID")
+                            .required(requestUserId.required())
+                            .schema(new UUIDSchema())));
             return operation;
         };
     }

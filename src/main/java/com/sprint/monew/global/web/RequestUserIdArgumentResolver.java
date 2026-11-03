@@ -40,6 +40,10 @@ public class RequestUserIdArgumentResolver implements HandlerMethodArgumentResol
         String userIdValue = webRequest.getHeader(USER_ID_HEADER);
 
         if (!StringUtils.hasText(userIdValue)) {
+            RequestUserId annotation = parameter.getParameterAnnotation(RequestUserId.class);
+            if (annotation != null && !annotation.required()) {
+                return null;
+            }
             throw new MissingRequestHeaderException(USER_ID_HEADER, parameter);
         }
 

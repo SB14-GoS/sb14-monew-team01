@@ -69,14 +69,16 @@ public class CommentController implements CommentApiDocs {
 
     @DeleteMapping("/{commentId}")
     @Override
-    public ResponseEntity<Void> delete(@PathVariable UUID commentId, @RequestUserId UUID requesterUserId) {
+    public ResponseEntity<Void> delete(
+            @PathVariable UUID commentId, @RequestUserId(required = false) UUID requesterUserId) {
         commentService.delete(commentId, requesterUserId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{commentId}/hard")
     @Override
-    public ResponseEntity<Void> deleteHard(@PathVariable UUID commentId, @RequestUserId UUID requesterUserId) {
+    public ResponseEntity<Void> deleteHard(
+            @PathVariable UUID commentId, @RequestUserId(required = false) UUID requesterUserId) {
         commentService.deleteHard(commentId, requesterUserId);
         return ResponseEntity.noContent().build();
     }

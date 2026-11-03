@@ -35,21 +35,25 @@ public class UserController implements UserApiDocs {
     @Override
     @PatchMapping("/api/users/{userId}")
     public ResponseEntity<UserDto> updateNickname(
-            @PathVariable UUID userId, @RequestUserId UUID requesterId, @Valid @RequestBody UserUpdateRequest request) {
+            @PathVariable UUID userId,
+            @RequestUserId(required = false) UUID requesterId,
+            @Valid @RequestBody UserUpdateRequest request) {
         UserDto result = userService.updateNickname(userId, requesterId, request);
         return ResponseEntity.status(HttpStatus.OK).body(result);
     }
 
     @Override
     @DeleteMapping("/api/users/{userId}")
-    public ResponseEntity<Void> softDelete(@PathVariable UUID userId, @RequestUserId UUID requesterId) {
+    public ResponseEntity<Void> softDelete(
+            @PathVariable UUID userId, @RequestUserId(required = false) UUID requesterId) {
         userService.softDelete(userId, requesterId);
         return ResponseEntity.noContent().build();
     }
 
     @Override
     @DeleteMapping("/api/users/{userId}/hard")
-    public ResponseEntity<Void> hardDelete(@PathVariable UUID userId, @RequestUserId UUID requesterId) {
+    public ResponseEntity<Void> hardDelete(
+            @PathVariable UUID userId, @RequestUserId(required = false) UUID requesterId) {
         userService.hardDelete(userId, requesterId);
         return ResponseEntity.noContent().build();
     }
