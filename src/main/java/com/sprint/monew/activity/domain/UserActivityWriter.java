@@ -34,4 +34,10 @@ public interface UserActivityWriter {
     void removeCommentLike(UUID likerId, UUID commentId);
 
     void updateCommentLikeCount(UUID commentUserId, UUID commentId, long likeCount);
+
+    void removeCommentLikeFromAll(UUID commentId);
+
+    void removeArticleViewFromAll(UUID articleId);
+
+    void removeCommentLikesOfUserFromAll(UUID commentUserId);
 }

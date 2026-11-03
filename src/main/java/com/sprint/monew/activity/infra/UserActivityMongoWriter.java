@@ -103,6 +103,27 @@ public class UserActivityMongoWriter implements UserActivityWriter {
         mongoTemplate.updateFirst(query, update, UserActivityDocument.class);
     }
 
+    @Override
+    public void removeCommentLikeFromAll(UUID commentId) {
+        Query query = Query.query(Criteria.where("commentLikes.commentId").is(commentId));
+        Update update = new Update().pull("commentLikes", new Document("commentId", commentId));
+        mongoTemplate.updateMulti(query, update, UserActivityDocument.class);
+    }
+
+    @Override
+    public void removeArticleViewFromAll(UUID articleId) {
+        Query query = Query.query(Criteria.where("articleViews.articleId").is(articleId));
+        Update update = new Update().pull("articleViews", new Document("articleId", articleId));
+        mongoTemplate.updateMulti(query, update, UserActivityDocument.class);
+    }
+
+    @Override
+    public void removeCommentLikesOfUserFromAll(UUID commentUserId) {
+        Query query = Query.query(Criteria.where("commentLikes.commentUserId").is(commentUserId));
+        Update update = new Update().pull("commentLikes", new Document("commentUserId", commentUserId));
+        mongoTemplate.updateMulti(query, update, UserActivityDocument.class);
+    }
+
     private void pushRecent(UUID userId, String field, Object item) {
         Update update =
                 new Update().push(field).atPosition(0).slice(RECENT_LIMIT).each(item);
