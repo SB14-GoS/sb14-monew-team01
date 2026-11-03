@@ -6,7 +6,6 @@ import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.exception.InvalidRssResponseException;
 import com.sprint.monew.article.infra.source.dto.RssItem;
 import com.sprint.monew.article.infra.source.dto.RssResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -14,8 +13,6 @@ import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.event.Level;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -36,43 +33,45 @@ public class RssNewsClient implements NewsSourceClient {
 
     @Override
     public List<RawArticle> fetch(Collection<String> keywords) {
+        long startedAt = System.nanoTime();
         List<RawArticle> result = new ArrayList<>();
         RuntimeException lastFailure = null;
-        boolean fetched = false;
+        int successCount = 0;
         for (String feedUrl : feedUrls) {
             try {
                 result.addAll(fetchFeed(feedUrl));
-                fetched = true;
+                successCount++;
             } catch (RuntimeException e) {
                 // 한 피드가 실패해도 다른 분야의 기사는 계속 수집한다.
                 lastFailure = e;
             }
         }
-        if (!fetched && lastFailure != null) {
+        log.info(
+                "RSS 수집 종료 - source: {}, 성공: {}, 실패: {}, 기사: {}건, 소요시간: {}초",
+                source,
+                successCount,
+                feedUrls.size() - successCount,
+                result.size(),
+                (System.nanoTime() - startedAt) / 1_000_000_000.0);
+        if (successCount == 0 && lastFailure != null) {
             throw lastFailure;
         }
         return result;
     }
 
     private List<RawArticle> fetchFeed(String feedUrl) {
-        log.info("RSS 뉴스 수집 요청 - source: {}, url: {}", source, feedUrl);
+        log.debug("RSS 뉴스 수집 요청 - source: {}, url: {}", source, feedUrl);
         List<RawArticle> result = new ArrayList<>();
-
-        /* 로그로 찍힐 외부 응답 원문 */
-        StringBuilder responseBody = new StringBuilder();
 
         try {
             RssResponse response = restClient
                     .get()
                     .uri(feedUrl)
                     .retrieve()
-                    .onStatus(status -> true, (request, httpResponse) -> {
-                        responseBody.append(StreamUtils.copyToString(httpResponse.getBody(), StandardCharsets.UTF_8));
-                        if (httpResponse.getStatusCode().isError()) {
-                            new DefaultResponseErrorHandler()
-                                    .handleError(request.getURI(), request.getMethod(), httpResponse);
-                        }
-                    })
+                    .onStatus(
+                            status -> status.isError(),
+                            (request, httpResponse) -> new DefaultResponseErrorHandler()
+                                    .handleError(request.getURI(), request.getMethod(), httpResponse))
                     .body(RssResponse.class);
 
             /* 응답이 비어있거나 채널이 비어있는건 비정상적 응답 */
@@ -101,17 +100,15 @@ public class RssNewsClient implements NewsSourceClient {
 
             return result;
         } catch (RuntimeException e) {
-            Level level = e instanceof RestClientResponseException httpException
-                            && httpException.getStatusCode().is4xxClientError()
-                    ? Level.WARN
-                    : Level.ERROR;
-            log.atLevel(level)
-                    .log(
-                            "RSS 뉴스 수집 요청 처리 실패 - source: {}, url: {}, response: {}, exception: {}",
-                            source,
-                            feedUrl,
-                            responseBody,
-                            e.toString());
+            String status = e instanceof RestClientResponseException httpException
+                    ? httpException.getStatusCode().toString()
+                    : "-";
+            log.warn(
+                    "RSS 피드 수집 실패 - source: {}, url: {}, status: {}, error: {}",
+                    source,
+                    feedUrl,
+                    status,
+                    e.getClass().getSimpleName());
             throw e;
         }
     }

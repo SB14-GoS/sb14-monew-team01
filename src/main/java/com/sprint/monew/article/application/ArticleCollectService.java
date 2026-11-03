@@ -43,6 +43,7 @@ public class ArticleCollectService {
     @Transactional
     /* 배치로 돌릴거 */
     public void save() {
+        long saveStartedAt = System.nanoTime();
         log.info("기사 수집 및 저장 요청: NAVER, CHOSUN, HANKUNG, YEONHAP");
         List<InterestKeywordInfo> keywordInfos = interestQueryApi.getAllKeywords();
 
@@ -52,31 +53,48 @@ public class ArticleCollectService {
                 .collect(Collectors.toSet());
 
         List<RawArticle> totalResult = new ArrayList<>();
+        long collectNaverStartedAt = System.nanoTime();
         try {
             totalResult.addAll(naverNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("네이버 기사 수집 실패", e);
+            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
+        } finally {
+            log.info(
+                    "네이버 기사 수집 종료 - 기사: {}건, 소요시간: {}초",
+                    totalResult.size(),
+                    (System.nanoTime() - collectNaverStartedAt) / 1_000_000_000.0);
         }
 
         List<RawArticle> rssTotalResult = new ArrayList<>();
+        long collectChosunStartedAt = System.nanoTime();
         try {
             rssTotalResult.addAll(chosunNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("조선뉴스 기사 수집 실패", e);
+            log.error("조선뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+        } finally {
+            log.debug("조선 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectChosunStartedAt) / 1_000_000_000.0);
         }
 
+        long collectYeonhapStartedAt = System.nanoTime();
         try {
             rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("연합뉴스 기사 수집 실패", e);
+            log.error("연합뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+        } finally {
+            log.debug("연합 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectYeonhapStartedAt) / 1_000_000_000.0);
         }
 
+        long collectHankyungStartedAt = System.nanoTime();
         try {
             rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("한경뉴스 기사 수집 실패", e);
+            log.error("한경뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+        } finally {
+            log.debug("한경 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectHankyungStartedAt) / 1_000_000_000.0);
         }
 
+        long processStartedAt = System.nanoTime();
+        long stageStartedAt = processStartedAt;
         /* 가져온 Rss 한번에 키워드 포함되는지 검사
          * 검사 통과된 아이들만 최종 결과에 포함 */
         for (RawArticle article : rssTotalResult) {
@@ -94,6 +112,12 @@ public class ArticleCollectService {
             }
         }
 
+        log.debug(
+                "RSS 키워드 필터링 완료 - 대상: {}건, 소요시간: {}초",
+                rssTotalResult.size(),
+                (System.nanoTime() - stageStartedAt) / 1_000_000_000.0);
+
+        stageStartedAt = System.nanoTime();
         /* 중복되는 링크 없이 하려고 중복을 허용하지 않는 Set<> 을사용 */
         Set<String> sourceUrl = new HashSet<>();
 
@@ -161,8 +185,16 @@ public class ArticleCollectService {
             }
         }
 
+        log.debug(
+                "기사 중복 확인·객체 생성·관심사 매핑 완료 - 신규 기사: {}건, 매핑: {}건, 소요시간: {}초",
+                result.size(),
+                mappingResult.size(),
+                (System.nanoTime() - stageStartedAt) / 1_000_000_000.0);
+
+        stageStartedAt = System.nanoTime();
         articleRepository.saveAll(result);
         articleInterestRepository.saveAll(mappingResult);
+        log.debug("기사·관심사 매핑 saveAll 호출 완료 - 소요시간: {}초", (System.nanoTime() - stageStartedAt) / 1_000_000_000.0);
 
         for (InterestKeywordInfo interest : keywordInfos) {
             long count = articleCounts.getOrDefault(interest.interestId(), 0L);
@@ -171,5 +203,11 @@ public class ArticleCollectService {
                 eventPublisher.publishEvent(new ArticlesCollectedEvent(interest.interestId(), interest.name(), count));
             }
         }
+
+        log.debug("기사 수집 후 처리 완료 - 소요시간: {}초", (System.nanoTime() - processStartedAt) / 1_000_000_000.0);
+        log.info(
+                "기사 수집 및 저장 완료 - 신규 기사: {}건, 전체 소요시간: {}초",
+                result.size(),
+                (System.nanoTime() - saveStartedAt) / 1_000_000_000.0);
     }
 }
