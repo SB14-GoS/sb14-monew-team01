@@ -125,7 +125,7 @@ class LogUploadTest {
     @DisplayName("스케줄러는 중간에 예외가 발생해도 중단 없이 최근 7일 치 로그 업로드를 모두 시도하고 그 외 날짜는 시도하지 않는다")
     void schedulerAttempts7DaysUploadAndContinuesOnException() {
         // given: 테스트가 자정에 실행되어도 실패하지 않도록 고정된 시간(Clock.fixed) 사용
-        java.time.Instant fixedInstant = java.time.Instant.parse("2026-11-03T12:00:00Z");
+        java.time.Instant fixedInstant = java.time.Instant.parse("2026-11-02T15:05:00Z");
         Clock fixedClock = Clock.fixed(fixedInstant, java.time.ZoneId.of("Asia/Seoul"));
 
         LogUploadService mockLogUploadService = mock(LogUploadService.class);
