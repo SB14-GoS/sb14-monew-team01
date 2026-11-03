@@ -1,5 +1,6 @@
 package com.sprint.monew.user.application;
 
+import com.sprint.monew.global.metric.BatchMetricsListener;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +22,14 @@ public class UserPurgeJobConfig {
     private static final Duration RETENTION = Duration.ofDays(1);
 
     private final UserService userService;
+    private final BatchMetricsListener batchMetricsListener;
 
     @Bean
     Job userPurgeJob(JobRepository jobRepository, Step userPurgeStep) {
-        return new JobBuilder(JOB_NAME, jobRepository).start(userPurgeStep).build();
+        return new JobBuilder(JOB_NAME, jobRepository)
+                .start(userPurgeStep)
+                .listener(batchMetricsListener)
+                .build();
     }
 
     @Bean
@@ -45,6 +50,7 @@ public class UserPurgeJobConfig {
                             return RepeatStatus.FINISHED;
                         },
                         transactionManager)
+                .listener(batchMetricsListener)
                 .build();
     }
 }

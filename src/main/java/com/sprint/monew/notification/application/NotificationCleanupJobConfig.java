@@ -1,5 +1,6 @@
 package com.sprint.monew.notification.application;
 
+import com.sprint.monew.global.metric.BatchMetricsListener;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class NotificationCleanupJobConfig {
 
     private final NotificationService notificationService;
+    private final BatchMetricsListener batchMetricsListener;
 
     @Bean
     Step notificationCleanupStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
@@ -35,6 +37,8 @@ public class NotificationCleanupJobConfig {
                                     .toString();
                             int deletedCount = notificationService.deleteExpireNotification(Instant.parse(requestedAt));
 
+                            contribution.incrementWriteCount(deletedCount);
+
                             // 이번 Job 실행에 삭제 건수를 기록
                             chunkContext
                                     .getStepContext()
@@ -46,6 +50,7 @@ public class NotificationCleanupJobConfig {
                             return RepeatStatus.FINISHED;
                         },
                         transactionManager)
+                .listener(batchMetricsListener)
                 .build();
     }
 
@@ -54,6 +59,7 @@ public class NotificationCleanupJobConfig {
         return new JobBuilder("notificationCleanupJob", jobRepository)
                 // 배치실행 시작
                 .start(step)
+                .listener(batchMetricsListener)
                 .listener(new JobExecutionListener() {
                     @Override
                     public void afterJob(JobExecution jobExecution) {

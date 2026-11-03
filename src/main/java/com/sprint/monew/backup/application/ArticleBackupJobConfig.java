@@ -1,5 +1,6 @@
 package com.sprint.monew.backup.application;
 
+import com.sprint.monew.global.metric.BatchMetricsListener;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
@@ -20,10 +21,14 @@ public class ArticleBackupJobConfig {
     public static final String TARGET_DATE = "targetDate";
 
     private final ArticleBackupService articleBackupService;
+    private final BatchMetricsListener batchMetricsListener;
 
     @Bean
     Job articleBackupJob(JobRepository jobRepository, Step articleBackupStep) {
-        return new JobBuilder(JOB_NAME, jobRepository).start(articleBackupStep).build();
+        return new JobBuilder(JOB_NAME, jobRepository)
+                .start(articleBackupStep)
+                .listener(batchMetricsListener)
+                .build();
     }
 
     @Bean
@@ -43,6 +48,7 @@ public class ArticleBackupJobConfig {
                             return RepeatStatus.FINISHED;
                         },
                         transactionManager)
+                .listener(batchMetricsListener)
                 .build();
     }
 }
