@@ -5,7 +5,7 @@
 
   <!-- 기존 application.yml의 콘솔 패턴과 동일하게 유지 -->
   <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"/>
-  <property name="LOG_DIR" value="${LOG_DIR:-./logs}"/>
+  <springProperty scope="context" name="LOG_DIR" source="monew.log.dir" defaultValue="./logs"/>
 
   <!-- 1. 콘솔 출력 Appender -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -23,7 +23,7 @@
     </encoder>
     <!-- 자정이 지나면 monew.2026-11-02.log 형태로 파일명을 변경하여 마감 -->
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-      <fileNamePattern>${LOG_DIR}/monew.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <fileNamePattern>${LOG_DIR}/monew.%d{yyyy-MM-dd,Asia/Seoul}.log</fileNamePattern>
       <!-- 서버 디스크 용량 관리를 위해 최근 7일 치 파일만 보관 -->
       <maxHistory>7</maxHistory>
     </rollingPolicy>

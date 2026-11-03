@@ -15,10 +15,16 @@ public class LogUploadScheduler {
     private final Clock clock;
 
     // 00시 05분에 전날의 로그 파일 업로드
-    @Scheduled(cron = "${monew.log.upload-cron:0 5 0 * * *}")
+    @Scheduled(cron = "${monew.log.upload-cron:0 5 0 * * *}", zone = "Asia/Seoul")
     public void uploadYesterdayLog() {
-        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
-        log.info("일일 로그 S3 업로드 스케줄러 실행 (날짜: {})", yesterday);
-        logUploadService.uploadLogByDate(yesterday);
+        for (int i = 1; i <= 7; i++) {
+            LocalDate targetDate = LocalDate.now(clock).minusDays(i);
+            try {
+                // 파일이 없으면 서비스 단에서 false 반환 후 스킵됨
+                logUploadService.uploadLogByDate(targetDate);
+            } catch (Exception e) {
+                log.warn("날짜 {} 로그 업로드 실패. 다음 스케줄러 실행 시 재시도됩니다. 원인: {}", targetDate, e.getMessage());
+            }
+        }
     }
 }

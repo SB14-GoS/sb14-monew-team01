@@ -1,6 +1,7 @@
 package com.sprint.monew.global.log;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -103,7 +104,7 @@ class LogUploadTest {
     }
 
     @Test
-    @DisplayName("S3 업로드 중 예외가 발생하면 예외를 잡아서 false를 반환한다")
+    @DisplayName("S3 업로드 중 예외가 발생하면 IllegalStateException을 던진다")
     void uploadLogWhenS3ExceptionOccurs() throws IOException {
         // given
         LocalDate targetDate = LocalDate.of(2026, 11, 1);
@@ -113,11 +114,11 @@ class LogUploadTest {
         given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .willThrow(new RuntimeException("S3 네트워크 오류"));
 
-        // when
-        boolean result = logUploadService.uploadLogByDate(targetDate);
-
-        // then
-        assertThat(result).isFalse();
+        // when & then: 예외가 정상적으로 던져지고, 우리가 던진 메시지와 원인 예외가 잘 담겨있는지 검증
+        assertThatThrownBy(() -> logUploadService.uploadLogByDate(targetDate))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("S3 로그 업로드 실패")
+                .hasCauseInstanceOf(RuntimeException.class);
     }
 
     @Test

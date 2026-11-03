@@ -60,8 +60,7 @@ public class LogUploadService {
             log.info("S3 로그 업로드 완료: s3://{}/{}", logBucket, s3Key);
             return true;
         } catch (Exception e) {
-            log.error("S3 로그 업로드 실패 (대상 파일: {})", logFilePath, e);
-            return false;
+            throw new IllegalStateException("S3 로그 업로드 실패 (대상 파일: " + logFilePath + ")", e);
         }
     }
 }
