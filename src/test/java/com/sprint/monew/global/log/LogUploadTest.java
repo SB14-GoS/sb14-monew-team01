@@ -122,13 +122,16 @@ class LogUploadTest {
     }
 
     @Test
-    @DisplayName("스케줄러는 중간에 예외가 발생해도 중단 없이 최근 7일 치 로그 업로드를 모두 시도한다")
+    @DisplayName("스케줄러는 중간에 예외가 발생해도 중단 없이 최근 7일 치 로그 업로드를 모두 시도하고 그 외 날짜는 시도하지 않는다")
     void schedulerAttempts7DaysUploadAndContinuesOnException() {
-        // given: 스케줄러 동작을 검증하기 위해 LogUploadService를 Mock으로 생성하고 주입
-        LogUploadService mockLogUploadService = mock(LogUploadService.class);
-        LogUploadScheduler logUploadScheduler = new LogUploadScheduler(mockLogUploadService, Clock.systemDefaultZone());
+        // given: 테스트가 자정에 실행되어도 실패하지 않도록 고정된 시간(Clock.fixed) 사용
+        java.time.Instant fixedInstant = java.time.Instant.parse("2026-11-03T12:00:00Z");
+        Clock fixedClock = Clock.fixed(fixedInstant, java.time.ZoneId.of("Asia/Seoul"));
 
-        LocalDate today = LocalDate.now();
+        LogUploadService mockLogUploadService = mock(LogUploadService.class);
+        LogUploadScheduler logUploadScheduler = new LogUploadScheduler(mockLogUploadService, fixedClock);
+
+        LocalDate today = LocalDate.now(fixedClock);
         LocalDate exceptionDate = today.minusDays(3); // 3일 전 로그 업로드 시 예외가 발생하도록 설정
 
         willThrow(new IllegalStateException("업로드 실패 테스트"))
@@ -138,9 +141,12 @@ class LogUploadTest {
         // when
         logUploadScheduler.uploadYesterdayLog();
 
-        // then: 예외가 터진 날짜를 포함하여, 1일 전부터 7일 전까지 총 7번 메서드가 호출되었는지 검증
+        // then: 1일 전부터 7일 전까지 총 7번 메서드가 호출되었는지 검증
         for (int i = 1; i <= 7; i++) {
             verify(mockLogUploadService, times(1)).uploadLogByDate(today.minusDays(i));
         }
+
+        // 추가 검증: 7일 치 이외의 날짜(예: 8일 전 등)에는 절대 업로드를 시도하지 않음을 엄격히 검증
+        org.mockito.Mockito.verifyNoMoreInteractions(mockLogUploadService);
     }
 }
