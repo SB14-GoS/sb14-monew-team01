@@ -69,6 +69,21 @@ class CommentControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "/hard"})
+    @DisplayName("명세대로 요청자 헤더 없이 댓글을 삭제하면 요청자 null로 처리하고 204를 반환한다")
+    void deleteWithoutHeader(String suffix) throws Exception {
+        UUID commentId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/comments/{commentId}" + suffix, commentId)).andExpect(status().isNoContent());
+
+        if (suffix.isEmpty()) {
+            verify(commentService).delete(commentId, null);
+        } else {
+            verify(commentService).deleteHard(commentId, null);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/hard"})
     @DisplayName("존재하지 않는 댓글 삭제 시 404를 반환한다")
     void deleteNotFound(String suffix) throws Exception {
         UUID commentId = UUID.randomUUID();

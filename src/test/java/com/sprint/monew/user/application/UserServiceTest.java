@@ -190,6 +190,23 @@ public class UserServiceTest {
     }
 
     @Test
+    @DisplayName("요청자 정보가 없으면 본인 확인 없이 닉네임 수정·논리 삭제·물리 삭제를 처리한다")
+    void withoutRequester() {
+        UUID userId = UUID.randomUUID();
+        User user = new User("woody@monew.com", "우디", "encoded-password");
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        UserDto result = userService.updateNickname(userId, null, new UserUpdateRequest("보안관우디"));
+        userService.softDelete(userId, null);
+        userService.hardDelete(userId, null);
+
+        assertThat(result.nickname()).isEqualTo("보안관우디");
+        assertThat(user.isDeleted()).isTrue();
+        verify(userRepository).delete(user);
+        verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
+    }
+
+    @Test
     @DisplayName("다른 사용자의 정보는 수정할 수 없다")
     void updateNicknameOfOtherUser() {
         UUID userId = UUID.randomUUID();

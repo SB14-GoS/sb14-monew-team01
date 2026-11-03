@@ -214,11 +214,38 @@ public class UserControllerTest {
     }
 
     @Test
-    @DisplayName("요청자 헤더가 없으면 400을 반환한다")
-    void softDeleteWithoutHeader() throws Exception {
+    @DisplayName("명세대로 요청자 헤더 없이 논리·물리 삭제하면 요청자 null로 처리하고 204를 반환한다")
+    void deleteWithoutHeader() throws Exception {
         UUID userId = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/users/{userId}", userId)).andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/api/users/{userId}", userId)).andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/users/{userId}/hard", userId)).andExpect(status().isNoContent());
+
+        verify(userService).softDelete(userId, null);
+        verify(userService).hardDelete(userId, null);
+    }
+
+    @Test
+    @DisplayName("명세대로 요청자 헤더 없이 닉네임을 수정하면 요청자 null로 처리하고 200을 반환한다")
+    void updateNicknameWithoutHeader() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserDto userDto = new UserDto(userId, "woody@monew.com", "보안관우디", Instant.now());
+        given(userService.updateNickname(eq(userId), eq(null), any())).willReturn(userDto);
+
+        mockMvc.perform(patch("/api/users/{userId}", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "보안관우디"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("보안관우디"));
+    }
+
+    @Test
+    @DisplayName("요청자 헤더가 UUID 형식이 아니면 400을 반환한다")
+    void deleteWithInvalidHeader() throws Exception {
+        mockMvc.perform(delete("/api/users/{userId}", UUID.randomUUID()).header("Monew-Request-User-ID", "not-uuid"))
+                .andExpect(status().isBadRequest());
         verify(userService, never()).softDelete(any(), any());
     }
 

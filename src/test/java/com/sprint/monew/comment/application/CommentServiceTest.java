@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.article.api.ArticleCommandApi;
@@ -393,6 +394,26 @@ class CommentServiceTest {
         verify(comment, never()).softDelete();
         then(articleCommandApi).shouldHaveNoInteractions();
         then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 요청자_정보가_없으면_작성자_확인_없이_논리삭제와_물리삭제를_처리한다() {
+        UUID commentId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        Comment comment = mock(Comment.class);
+        given(comment.getId()).willReturn(commentId);
+        given(comment.getArticleId()).willReturn(articleId);
+        given(comment.getUserId()).willReturn(UUID.randomUUID());
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentRepository.softDeleteIfActive(commentId)).willReturn(1);
+        given(commentRepository.hardDeleteIfActive(commentId)).willReturn(1);
+
+        commentService.delete(commentId, null);
+        commentService.deleteHard(commentId, null);
+
+        then(commentRepository).should().softDeleteIfActive(commentId);
+        then(commentRepository).should().hardDeleteIfActive(commentId);
+        then(articleCommandApi).should(times(2)).decreaseCommentCount(articleId);
     }
 
     @Test
