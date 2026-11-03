@@ -18,6 +18,7 @@ public class LogUploadService {
     private final S3Client s3Client;
     private final String logBucket;
     private final String logDir;
+    private final String instanceId;
 
     public LogUploadService(
             S3Client s3Client,
@@ -26,9 +27,17 @@ public class LogUploadService {
         this.s3Client = s3Client;
         this.logBucket = logBucket;
         this.logDir = logDir;
+
+        String hostname = System.getenv("HOSTNAME");
+        this.instanceId = (hostname != null && !hostname.isBlank())
+                ? hostname
+                : java.util.UUID.randomUUID().toString().substring(0, 8);
     }
 
     public boolean uploadLogByDate(LocalDate targetDate) {
+        String fileName = String.format("monew.%s.log", targetDate);
+        Path logFilePath = Paths.get(logDir, fileName);
+
         if (targetDate == null) {
             log.warn("업로드 대상 날짜가 지정되지 않아 업로드를 건너뜁니다.");
             return false;
@@ -39,15 +48,12 @@ public class LogUploadService {
             return false;
         }
 
-        String fileName = String.format("monew.%s.log", targetDate);
-        Path logFilePath = Paths.get(logDir, fileName);
-
         if (!Files.exists(logFilePath)) {
             log.info("업로드할 로그 파일이 존재하지 않습니다: {}", logFilePath);
             return false;
         }
 
-        String s3Key = "logs/" + fileName;
+        String s3Key = "logs/" + instanceId + "/" + fileName;
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()

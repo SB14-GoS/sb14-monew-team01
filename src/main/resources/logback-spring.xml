@@ -25,7 +25,7 @@
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
       <fileNamePattern>${LOG_DIR}/monew.%d{yyyy-MM-dd,Asia/Seoul}.log</fileNamePattern>
       <!-- 서버 디스크 용량 관리를 위해 최근 7일 치 파일만 보관 -->
-      <maxHistory>7</maxHistory>
+      <maxHistory>14</maxHistory>
     </rollingPolicy>
   </appender>
 
