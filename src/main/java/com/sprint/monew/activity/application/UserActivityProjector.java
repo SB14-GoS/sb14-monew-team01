@@ -5,6 +5,7 @@ import com.sprint.monew.activity.domain.UserActivityDocument.CommentItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentLikeItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.SubscriptionItem;
 import com.sprint.monew.activity.domain.UserActivityWriter;
+import com.sprint.monew.article.api.ArticleDeleteEvent;
 import com.sprint.monew.article.api.ArticleViewedEvent;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.api.CommentDeletedEvent;
@@ -112,6 +113,11 @@ public class UserActivityProjector {
         } catch (Exception exception) {
             log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserDeleted", event.userId(), exception);
         }
+        try {
+            userActivityWriter.removeCommentLikesOfUserFromAll(event.userId());
+        } catch (Exception exception) {
+            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserDeletedLikes", event.userId(), exception);
+        }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -148,6 +154,11 @@ public class UserActivityProjector {
             userActivityWriter.removeComment(event.userId(), event.commentId());
         } catch (Exception exception) {
             log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentDeleted", event.userId(), exception);
+        }
+        try {
+            userActivityWriter.removeCommentLikeFromAll(event.commentId());
+        } catch (Exception exception) {
+            log.error("활동 내역 갱신 실패 - event: {}, commentId: {}", "CommentDeletedLikes", event.commentId(), exception);
         }
     }
 
@@ -190,6 +201,15 @@ public class UserActivityProjector {
                     event.commentUserId(), event.commentId(), event.commentLikeCount());
         } catch (Exception exception) {
             log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentUnlikedCount", event.commentUserId(), exception);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onArticleDeleted(ArticleDeleteEvent event) {
+        try {
+            userActivityWriter.removeArticleViewFromAll(event.articleId());
+        } catch (Exception exception) {
+            log.error("활동 내역 갱신 실패 - event: {}, articleId: {}", "ArticleDeleted", event.articleId(), exception);
         }
     }
 }
