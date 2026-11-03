@@ -1,6 +1,7 @@
 FROM eclipse-temurin:17-jre-alpine
 RUN addgroup -S app && adduser -S -G app app
 WORKDIR /app
+RUN mkdir -p /app/logs && chown app:app /app/logs
 COPY --chown=app:app build/libs/*SNAPSHOT.jar app.jar
 EXPOSE 8080
 USER app
