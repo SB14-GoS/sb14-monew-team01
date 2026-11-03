@@ -4,17 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -122,17 +122,25 @@ class LogUploadTest {
     }
 
     @Test
-    @DisplayName("스케줄러 실행 시 Clock 기준 어제 날짜의 로그 업로드를 호출한다")
-    void schedulerUploadsYesterdayLog() {
-        // given: 서울 시간 기준 2026-11-02 00:05:00으로 고정된 Clock 설정
-        Clock fixedClock = Clock.fixed(Instant.parse("2026-11-01T15:05:00Z"), ZoneId.of("Asia/Seoul"));
-        LogUploadService mockService = mock(LogUploadService.class);
-        LogUploadScheduler scheduler = new LogUploadScheduler(mockService, fixedClock);
+    @DisplayName("스케줄러는 중간에 예외가 발생해도 중단 없이 최근 7일 치 로그 업로드를 모두 시도한다")
+    void schedulerAttempts7DaysUploadAndContinuesOnException() {
+        // given: 스케줄러 동작을 검증하기 위해 LogUploadService를 Mock으로 생성하고 주입
+        LogUploadService mockLogUploadService = mock(LogUploadService.class);
+        LogUploadScheduler logUploadScheduler = new LogUploadScheduler(mockLogUploadService, Clock.systemDefaultZone());
+
+        LocalDate today = LocalDate.now();
+        LocalDate exceptionDate = today.minusDays(3); // 3일 전 로그 업로드 시 예외가 발생하도록 설정
+
+        willThrow(new IllegalStateException("업로드 실패 테스트"))
+                .given(mockLogUploadService)
+                .uploadLogByDate(exceptionDate);
 
         // when
-        scheduler.uploadYesterdayLog();
+        logUploadScheduler.uploadYesterdayLog();
 
-        // then: 어제 날짜인 2026-11-01로 호출되었는지 검증
-        verify(mockService).uploadLogByDate(LocalDate.of(2026, 11, 1));
+        // then: 예외가 터진 날짜를 포함하여, 1일 전부터 7일 전까지 총 7번 메서드가 호출되었는지 검증
+        for (int i = 1; i <= 7; i++) {
+            verify(mockLogUploadService, times(1)).uploadLogByDate(today.minusDays(i));
+        }
     }
 }
