@@ -21,6 +21,8 @@ public class LogUploadScheduler {
     // 00시 05분에 전날의 로그 파일 업로드
     @Scheduled(cron = "${monew.log.upload-cron:0 5 0 * * ?}", zone = "Asia/Seoul")
     public void uploadYesterdayLog() {
+        log.info("S3 로그 업로드 스케줄러를 시작합니다. (Logback 롤링 트리거)");
+
         LocalDate today = LocalDate.now(clock);
 
         Set<LocalDate> targetDates = new HashSet<>(failedDates);

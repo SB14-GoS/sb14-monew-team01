@@ -60,7 +60,11 @@ class LogUploadTest {
 
         PutObjectRequest capturedRequest = requestCaptor.getValue();
         assertThat(capturedRequest.bucket()).isEqualTo("test-log-bucket");
-        assertThat(capturedRequest.key()).isEqualTo("logs/monew.2026-11-01.log");
+
+        // ★ 수정된 부분: 인스턴스 ID가 경로 중간에 무작위로 들어가므로 startsWith와 endsWith로 유연하게 검증
+        assertThat(capturedRequest.key()).startsWith("logs/");
+        assertThat(capturedRequest.key()).endsWith("/monew.2026-11-01.log");
+
         assertThat(capturedRequest.contentType()).isEqualTo("text/plain; charset=utf-8");
     }
 
