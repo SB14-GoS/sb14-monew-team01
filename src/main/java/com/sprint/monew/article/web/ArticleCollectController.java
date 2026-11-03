@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("local")
 @RestController
 @RequiredArgsConstructor
-public class ArticleCollectController {
+public class ArticleCollectController implements ArticleCollectApiDocs {
 
     private final ArticleCollectService articleCollectService;
 
