@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.sprint.monew.activity.domain.UserActivityDocument.ArticleViewItem;
@@ -13,6 +14,7 @@ import com.sprint.monew.activity.domain.UserActivityDocument.CommentItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentLikeItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.SubscriptionItem;
 import com.sprint.monew.activity.domain.UserActivityWriter;
+import com.sprint.monew.article.api.ArticleDeleteEvent;
 import com.sprint.monew.article.api.ArticleViewedEvent;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
 import com.sprint.monew.comment.api.CommentDeletedEvent;
@@ -128,6 +130,7 @@ class UserActivityProjectorTest {
         verify(writer).create(userId, "user@monew.com", "닉네임", firstTime);
         verify(writer).updateNickname(userId, "새닉네임");
         verify(writer).delete(userId);
+        verify(writer).removeCommentLikesOfUserFromAll(userId);
     }
 
     @Test
@@ -151,6 +154,15 @@ class UserActivityProjectorTest {
 
         verify(writer).updateCommentContent(userId, commentId, "수정된 내용");
         verify(writer).removeComment(userId, commentId);
+        verify(writer).removeCommentLikeFromAll(commentId);
+    }
+
+    @Test
+    @DisplayName("기사 삭제 이벤트는 모든 문서에서 그 기사의 본 기사 항목을 지운다")
+    void onArticleDeleted() {
+        projector.onArticleDeleted(new ArticleDeleteEvent(articleId));
+
+        verify(writer).removeArticleViewFromAll(articleId);
     }
 
     @Test
@@ -197,6 +209,46 @@ class UserActivityProjectorTest {
                 UUID.randomUUID(), userId, firstTime, articleId, "NAVER", "url", "제목", secondTime, "요약", 0L, 1L);
 
         assertThatCode(() -> projector.onArticleViewed(event)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("Writer가 모든 호출에서 실패해도 어떤 리스너도 예외를 밖으로 던지지 않는다")
+    void everyListenerSwallowsWriterException() {
+        UserActivityWriter failingWriter = mock(UserActivityWriter.class, invocation -> {
+            throw new RuntimeException("mongo down");
+        });
+        UserActivityProjector failing = new UserActivityProjector(failingWriter);
+        UUID interestId = UUID.randomUUID();
+
+        assertThatCode(() -> {
+                    failing.onArticleViewed(new ArticleViewedEvent(
+                            UUID.randomUUID(),
+                            userId,
+                            firstTime,
+                            articleId,
+                            "NAVER",
+                            "url",
+                            "제목",
+                            secondTime,
+                            "요약",
+                            0L,
+                            1L));
+                    failing.onInterestSubscribed(new InterestSubscribedEvent(
+                            UUID.randomUUID(), userId, interestId, "경제", List.of("주식"), 5L, firstTime));
+                    failing.onInterestUnsubscribed(new InterestUnsubscribedEvent(userId, interestId));
+                    failing.onInterestDeleted(new InterestDeletedEvent(interestId));
+                    failing.onUserRegistered(new UserRegisteredEvent(userId, "user@monew.com", "닉네임", firstTime));
+                    failing.onUserNicknameUpdated(new UserNicknameUpdatedEvent(userId, "새닉네임"));
+                    failing.onUserDeleted(new UserDeletedEvent(userId));
+                    failing.onCommentCreated(new CommentCreatedEvent(
+                            commentId, articleId, "기사 제목", userId, "작성자", "댓글 내용", 0L, firstTime));
+                    failing.onCommentUpdated(new CommentUpdatedEvent(commentId, userId, "수정된 내용"));
+                    failing.onCommentDeleted(new CommentDeletedEvent(commentId, userId));
+                    failing.onCommentLiked(commentLikedEvent(UUID.randomUUID(), UUID.randomUUID()));
+                    failing.onCommentUnliked(new CommentUnlikedEvent(commentId, UUID.randomUUID(), commentUserId, 2L));
+                    failing.onArticleDeleted(new ArticleDeleteEvent(articleId));
+                })
+                .doesNotThrowAnyException();
     }
 
     @Test

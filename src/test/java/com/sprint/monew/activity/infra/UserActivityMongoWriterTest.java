@@ -245,6 +245,66 @@ class UserActivityMongoWriterTest {
     }
 
     @Test
+    @DisplayName("삭제된 댓글의 좋아요는 모든 사용자 문서에서 빠지고 다른 좋아요는 남는다")
+    void removeCommentLikeFromAll() {
+        UUID otherUserId = UUID.randomUUID();
+        createUser(userId);
+        createUser(otherUserId);
+        UUID deletedCommentId = UUID.randomUUID();
+        UUID keptCommentId = UUID.randomUUID();
+        writer.addCommentLike(userId, commentLike(UUID.randomUUID(), deletedCommentId));
+        writer.addCommentLike(userId, commentLike(UUID.randomUUID(), keptCommentId));
+        writer.addCommentLike(otherUserId, commentLike(UUID.randomUUID(), deletedCommentId));
+
+        writer.removeCommentLikeFromAll(deletedCommentId);
+
+        assertThat(find(userId).getCommentLikes())
+                .extracting(CommentLikeItem::commentId)
+                .containsExactly(keptCommentId);
+        assertThat(find(otherUserId).getCommentLikes()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("삭제된 기사는 모든 사용자의 본 기사 목록에서 빠지고 다른 기사는 남는다")
+    void removeArticleViewFromAll() {
+        UUID otherUserId = UUID.randomUUID();
+        createUser(userId);
+        createUser(otherUserId);
+        ArticleViewItem kept = articleView(UUID.randomUUID());
+        ArticleViewItem deleted = articleView(UUID.randomUUID());
+        writer.addArticleView(userId, kept);
+        writer.addArticleView(userId, deleted);
+        writer.addArticleView(otherUserId, deleted);
+
+        writer.removeArticleViewFromAll(deleted.articleId());
+
+        assertThat(find(userId).getArticleViews())
+                .extracting(ArticleViewItem::articleId)
+                .containsExactly(kept.articleId());
+        assertThat(find(otherUserId).getArticleViews()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("삭제된 사용자가 쓴 댓글의 좋아요만 모든 사용자 문서에서 빠진다")
+    void removeCommentLikesOfUserFromAll() {
+        UUID otherUserId = UUID.randomUUID();
+        createUser(userId);
+        createUser(otherUserId);
+        CommentLikeItem deletedUsersComment = commentLike(UUID.randomUUID(), UUID.randomUUID());
+        CommentLikeItem keptLike = commentLike(UUID.randomUUID(), UUID.randomUUID());
+        writer.addCommentLike(userId, deletedUsersComment);
+        writer.addCommentLike(userId, keptLike);
+        writer.addCommentLike(otherUserId, deletedUsersComment);
+
+        writer.removeCommentLikesOfUserFromAll(deletedUsersComment.commentUserId());
+
+        assertThat(find(userId).getCommentLikes())
+                .extracting(CommentLikeItem::commentId)
+                .containsExactly(keptLike.commentId());
+        assertThat(find(otherUserId).getCommentLikes()).isEmpty();
+    }
+
+    @Test
     @DisplayName("댓글 좋아요 수를 바꾸면 작성자 문서의 해당 댓글만 바뀐다")
     void updateCommentLikeCount() {
         createUser(userId);
