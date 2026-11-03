@@ -23,7 +23,7 @@ public class LogUploadScheduler {
                 // 파일이 없으면 서비스 단에서 false 반환 후 스킵됨
                 logUploadService.uploadLogByDate(targetDate);
             } catch (Exception e) {
-                log.warn("날짜 {} 로그 업로드 실패. 다음 스케줄러 실행 시 재시도됩니다. 원인: {}", targetDate, e.getMessage());
+                log.warn("날짜 {} 로그 업로드 실패. 다음 스케줄러 실행 시 재시도됩니다.", targetDate, e);
             }
         }
     }
