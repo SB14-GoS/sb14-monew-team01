@@ -57,7 +57,7 @@ public class ArticleCollectService {
         try {
             totalResult.addAll(naverNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
+            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName(), e);
         } finally {
             log.info(
                     "네이버 기사 수집 종료 - 기사: {}건, 소요시간: {}초",
@@ -70,7 +70,7 @@ public class ArticleCollectService {
         try {
             rssTotalResult.addAll(chosunNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("조선뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+            log.error("조선뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName(), e);
         } finally {
             log.debug("조선 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectChosunStartedAt) / 1_000_000_000.0);
         }
@@ -79,7 +79,7 @@ public class ArticleCollectService {
         try {
             rssTotalResult.addAll(yeonhapNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("연합뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+            log.error("연합뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName(), e);
         } finally {
             log.debug("연합 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectYeonhapStartedAt) / 1_000_000_000.0);
         }
@@ -88,7 +88,7 @@ public class ArticleCollectService {
         try {
             rssTotalResult.addAll(hankyungNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("한경뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName());
+            log.error("한경뉴스 전체 피드 수집 실패 - error: {}", e.getClass().getSimpleName(), e);
         } finally {
             log.debug("한경 RSS 수집 종료 - 소요시간: {}초", (System.nanoTime() - collectHankyungStartedAt) / 1_000_000_000.0);
         }
