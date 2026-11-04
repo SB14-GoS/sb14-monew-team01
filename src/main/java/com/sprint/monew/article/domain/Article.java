@@ -9,6 +9,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -17,7 +18,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "articles")
+@Table(
+        name = "articles",
+        indexes = @Index(name = "idx_articles_published", columnList = "published_date DESC, created_at DESC, id DESC"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Article extends BaseSoftDeleteEntity {
 
