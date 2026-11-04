@@ -266,6 +266,15 @@ class ArticleQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void createsPublishedDateIndexInSortOrder() {
+        Object definition = em.createNativeQuery(
+                        "select indexdef from pg_indexes where tablename = 'articles' and indexname = 'idx_articles_published'")
+                .getSingleResult();
+
+        assertThat(definition.toString()).contains("(published_date DESC, created_at DESC, id DESC)");
+    }
+
+    @Test
     void emptyResultHasZeroCount() {
         ArticleSearchCondition condition =
                 condition(null, null, null, null, null, ArticleOrderBy.PUBLISH_DATE, SortDirection.ASC, null, null, 2);
