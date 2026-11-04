@@ -5,6 +5,7 @@ import static com.sprint.monew.article.domain.QArticleInterest.articleInterest;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -15,7 +16,6 @@ import com.sprint.monew.article.domain.repository.ArticleQueryRepository;
 import com.sprint.monew.article.domain.repository.ArticleSearchCondition;
 import com.sprint.monew.article.domain.repository.ArticleSearchCursor;
 import com.sprint.monew.global.common.SortDirection;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -130,12 +130,16 @@ public class ArticleQueryRepositoryImpl implements ArticleQueryRepository {
                         : article.createdAt.lt(cursor.after()))
                 .or(article.createdAt.eq(cursor.after()).and(idAfter));
         return switch (condition.orderBy()) {
-            case PUBLISH_DATE -> {
-                Instant value = cursor.publishDate();
-                BooleanExpression beyond =
-                        ascending ? article.publishedDate.gt(value) : article.publishedDate.lt(value);
-                yield beyond.or(article.publishedDate.eq(value).and(createdAfter));
-            }
+            /* row-value 비교라 idx_articles_published에서 커서 위치를 바로 찾는다 */
+            case PUBLISH_DATE ->
+                Expressions.booleanTemplate(
+                        ascending ? "({0}, {1}, {2}) > ({3}, {4}, {5})" : "({0}, {1}, {2}) < ({3}, {4}, {5})",
+                        article.publishedDate,
+                        article.createdAt,
+                        article.id,
+                        cursor.publishDate(),
+                        cursor.after(),
+                        cursor.articleId());
             case COMMENT_COUNT -> countAfter(article.commentCount, cursor.count(), ascending, createdAfter);
             case VIEW_COUNT -> countAfter(article.viewCount, cursor.count(), ascending, createdAfter);
         };
