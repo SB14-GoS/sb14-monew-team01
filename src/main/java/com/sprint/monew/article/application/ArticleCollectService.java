@@ -57,7 +57,7 @@ public class ArticleCollectService {
         try {
             totalResult.addAll(naverNewsClient.fetch(keywords));
         } catch (RuntimeException e) {
-            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName(), e);
+            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
         } finally {
             log.info(
                     "네이버 기사 수집 종료 - 기사: {}건, 소요시간: {}초",
