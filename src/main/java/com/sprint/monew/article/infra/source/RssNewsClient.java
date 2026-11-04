@@ -108,7 +108,8 @@ public class RssNewsClient implements NewsSourceClient {
                     source,
                     feedUrl,
                     status,
-                    e.getClass().getSimpleName());
+                    e.getClass().getSimpleName(),
+                    e);
             throw e;
         }
     }
