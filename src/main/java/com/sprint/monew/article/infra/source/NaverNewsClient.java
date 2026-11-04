@@ -92,7 +92,8 @@ public class NaverNewsClient implements NewsSourceClient {
                         "네이버 뉴스 수집 실패 - source: NAVER, keyword: {}, status: {}, error: {}",
                         keyword,
                         status,
-                        e.getClass().getSimpleName());
+                        e.getClass().getSimpleName(),
+                        e);
                 throw e;
             }
         }
