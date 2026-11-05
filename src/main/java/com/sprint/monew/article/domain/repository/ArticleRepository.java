@@ -34,7 +34,7 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     @Query("select a from Article a where a.createdAt >= :from and a.createdAt < :to and a.deletedAt is null")
     List<Article> findByCreatedAtRange(@Param("from") Instant from, @Param("to") Instant to);
 
-    Optional<Article> findBySourceUrl(String sourceUrl);
+    List<Article> findAllBySourceUrlIn(List<String> sourceUrls);
 
     @Query("select a.sourceUrl from Article a where a.sourceUrl in :sourceUrls")
     List<String> findSourceUrlsIn(@Param("sourceUrls") List<String> sourceUrls);

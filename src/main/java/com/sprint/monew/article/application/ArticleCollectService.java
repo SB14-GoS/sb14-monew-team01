@@ -4,6 +4,7 @@ import com.sprint.monew.article.api.ArticlesCollectedEvent;
 import com.sprint.monew.article.application.port.RawArticle;
 import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.ArticleInterest;
+import com.sprint.monew.article.domain.repository.ArticleInterestIdPair;
 import com.sprint.monew.article.domain.repository.ArticleInterestRepository;
 import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.infra.source.NaverNewsClient;
@@ -141,6 +142,16 @@ public class ArticleCollectService {
 
             /* 이번 묶음의 URL과 일치하는 기존 기사 조회 */
             List<Article> existingArticles = articleRepository.findAllBySourceUrlIn(chunkUrls);
+            /* 1000개 단위로  논리삭제 된 애들은 거르기*/
+            List<UUID> existingArticleIds = existingArticles.stream()
+                    .filter(article1 -> !article1.isDeleted())
+                    .map(article1 -> article1.getId())
+                    .toList();
+            /* (기사id, 관심사id)들을 리스트로 가져와서 set에 저장 */
+            Set<ArticleInterestIdPair> existingMappings = new HashSet<>();
+            if (!existingArticleIds.isEmpty()) {
+                existingMappings.addAll(articleInterestRepository.findInterestIdPairsByArticleIds(existingArticleIds));
+            }
 
             for (RawArticle each : chunkArticles) {
                 if (sourceUrl.add(each.sourceUrl())) {
@@ -174,8 +185,7 @@ public class ArticleCollectService {
                     for (UUID interestId : matchedInterestIds) {
                         /* 신규 기사이거나, 관심사 매핑이 없을때 */
                         if (newArticle
-                                || !articleInterestRepository.existsByArticle_IdAndInterestId(
-                                        article.getId(), interestId)) {
+                                || !existingMappings.contains(new ArticleInterestIdPair(article.getId(), interestId))) {
                             mappingResult.add(ArticleInterest.create(article, interestId));
                             if (newArticle) {
                                 long count = articleCounts.getOrDefault(interestId, 0L);
