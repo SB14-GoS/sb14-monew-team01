@@ -127,60 +127,82 @@ public class ArticleCollectService {
         List<ArticleInterest> mappingResult = new ArrayList<>();
         Map<UUID, Long> articleCounts = new HashMap<>();
 
-        /* 받아온 기사를 기사 객체로 바꾸고, db에 저장하는 로직
-         * 기사가 어떠한 관심사에 매핑되는지도 관심사-기사 매핑 테이블에 저장 */
-        for (RawArticle each : totalResult) {
-            /* 반환이 boolean Set에 새로 추가되면 true 추가가 안되면 false */
-            if (sourceUrl.add(each.sourceUrl())) {
-                Optional<Article> existingArticle = articleRepository.findBySourceUrl(each.sourceUrl());
-                boolean newArticle = existingArticle.isEmpty();
-                Article article;
+        /* 1개씩 반복 조회하는거 1000개씩 반복 조회로 변경 */
+        for (int i = 0; i < totalResult.size(); i += 1000) {
+            int end = i + 1000;
+            if (end > totalResult.size()) {
+                end = totalResult.size();
+            }
 
-                /* 비어 있으면 새로운 기사객체 생성 */
-                if (newArticle) {
-                    article = Article.create(
-                            each.title(), each.publishDate(), each.summary(), each.articleSource(), each.sourceUrl());
-                } else {
-                    /* 기사가 있으면 기사객체 꺼냄 */
-                    article = existingArticle.get();
-                    /* 그리고 논리삭제 됐는지 검사, 논리 삭제면 처음으로 돌아감*/
-                    if (article.isDeleted()) {
-                        continue;
-                    }
-                }
+            List<RawArticle> chunkArticles = totalResult.subList(i, end);
 
-                /* 가져온 관심사, 키워드 매핑정보들
-                 * 기사들의 제목이랑 내용에 포함되는 확인,
-                 * 포함되면 관심사 매핑하여 저장 */
-                String title = each.title().toLowerCase(Locale.ROOT);
-                String summary = each.summary().toLowerCase(Locale.ROOT);
-                boolean mapped = false;
-                for (InterestKeywordInfo interest : keywordInfos) {
-                    for (String keyword : interest.keywords()) {
-                        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
-                        boolean titleMatched = title.contains(lowerKeyword);
-                        boolean summaryMatched = summary.contains(lowerKeyword);
+            List<String> chunkUrls =
+                    chunkArticles.stream().map(RawArticle::sourceUrl).distinct().toList();
 
-                        if (titleMatched || summaryMatched) {
-                            mapped = true;
-                            /* 신규 기사이거나, 관심사 매핑이 없을때 */
-                            if (newArticle
-                                    || !articleInterestRepository.existsByArticle_IdAndInterestId(
-                                            article.getId(), interest.interestId())) {
-                                mappingResult.add(ArticleInterest.create(article, interest.interestId()));
-                                if (newArticle) {
-                                    UUID interestId = interest.interestId();
-                                    long count = articleCounts.getOrDefault(interestId, 0L);
-                                    articleCounts.put(interestId, count + 1);
-                                }
-                            }
-                            break;
+            /* 이번 묶음의 URL과 일치하는 기존 기사 조회 */
+            List<Article> existingArticles = articleRepository.findAllBySourceUrlIn(chunkUrls);
+
+            for (RawArticle each : chunkArticles) {
+                if (sourceUrl.add(each.sourceUrl())) {
+                    /* 기존에는 여기에서 db 조회를 했음
+                    개선: 미리 가져온 리스트를 조회 */
+                    Optional<Article> existingArticle = existingArticles.stream()
+                            .filter(article -> article.getSourceUrl().equals(each.sourceUrl()))
+                            .findFirst();
+
+                    boolean newArticle = existingArticle.isEmpty();
+                    Article article;
+
+                    /* 비어 있으면 새로운 기사객체 생성 */
+                    if (newArticle) {
+                        article = Article.create(
+                                each.title(),
+                                each.publishDate(),
+                                each.summary(),
+                                each.articleSource(),
+                                each.sourceUrl());
+                    } else {
+                        /* 기사가 있으면 기사객체 꺼냄 */
+                        article = existingArticle.get();
+                        /* 그리고 논리삭제 됐는지 검사, 논리 삭제면 처음으로 돌아감*/
+                        if (article.isDeleted()) {
+                            continue;
                         }
                     }
-                }
-                /* 관심사 키워드가 하나라도 매칭된 신규 기사만 저장 */
-                if (newArticle && mapped) {
-                    result.add(article);
+
+                    /* 가져온 관심사, 키워드 매핑정보들
+                     * 기사들의 제목이랑 내용에 포함되는 확인,
+                     * 포함되면 관심사 매핑하여 저장 */
+                    String title = each.title().toLowerCase(Locale.ROOT);
+                    String summary = each.summary().toLowerCase(Locale.ROOT);
+                    boolean mapped = false;
+                    for (InterestKeywordInfo interest : keywordInfos) {
+                        for (String keyword : interest.keywords()) {
+                            String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
+                            boolean titleMatched = title.contains(lowerKeyword);
+                            boolean summaryMatched = summary.contains(lowerKeyword);
+
+                            if (titleMatched || summaryMatched) {
+                                mapped = true;
+                                /* 신규 기사이거나, 관심사 매핑이 없을때 */
+                                if (newArticle
+                                        || !articleInterestRepository.existsByArticle_IdAndInterestId(
+                                                article.getId(), interest.interestId())) {
+                                    mappingResult.add(ArticleInterest.create(article, interest.interestId()));
+                                    if (newArticle) {
+                                        UUID interestId = interest.interestId();
+                                        long count = articleCounts.getOrDefault(interestId, 0L);
+                                        articleCounts.put(interestId, count + 1);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    /* 관심사 키워드가 하나라도 매칭된 신규 기사만 저장 */
+                    if (newArticle && mapped) {
+                        result.add(article);
+                    }
                 }
             }
         }
