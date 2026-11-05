@@ -10,7 +10,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface ArticleInterestRepository extends JpaRepository<ArticleInterest, UUID> {
 
-    boolean existsByArticle_IdAndInterestId(UUID articleId, UUID interestId);
+    @Query("""
+        select case when count(a) > 0 then true else false end
+        from ArticleInterest a
+        where a.article.id = :articleId and a.interestId = :interestId
+        """)
+    boolean existsMapping(@Param("articleId") UUID articleId, @Param("interestId") UUID interestId);
 
     @Modifying
     @Query("delete from ArticleInterest a where a.article.id = :articleId")
