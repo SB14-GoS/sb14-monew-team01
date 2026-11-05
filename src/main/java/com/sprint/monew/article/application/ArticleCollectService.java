@@ -170,37 +170,21 @@ public class ArticleCollectService {
                         }
                     }
 
-                    /* 가져온 관심사, 키워드 매핑정보들
-                     * 기사들의 제목이랑 내용에 포함되는 확인,
-                     * 포함되면 관심사 매핑하여 저장 */
-                    String title = each.title().toLowerCase(Locale.ROOT);
-                    String summary = each.summary().toLowerCase(Locale.ROOT);
-                    boolean mapped = false;
-                    for (InterestKeywordInfo interest : keywordInfos) {
-                        for (String keyword : interest.keywords()) {
-                            String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
-                            boolean titleMatched = title.contains(lowerKeyword);
-                            boolean summaryMatched = summary.contains(lowerKeyword);
-
-                            if (titleMatched || summaryMatched) {
-                                mapped = true;
-                                /* 신규 기사이거나, 관심사 매핑이 없을때 */
-                                if (newArticle
-                                        || !articleInterestRepository.existsByArticle_IdAndInterestId(
-                                                article.getId(), interest.interestId())) {
-                                    mappingResult.add(ArticleInterest.create(article, interest.interestId()));
-                                    if (newArticle) {
-                                        UUID interestId = interest.interestId();
-                                        long count = articleCounts.getOrDefault(interestId, 0L);
-                                        articleCounts.put(interestId, count + 1);
-                                    }
-                                }
-                                break;
+                    List<UUID> matchedInterestIds = findInterestIdsByKeywordMatch(each, keywordInfos);
+                    for (UUID interestId : matchedInterestIds) {
+                        /* 신규 기사이거나, 관심사 매핑이 없을때 */
+                        if (newArticle
+                                || !articleInterestRepository.existsByArticle_IdAndInterestId(
+                                        article.getId(), interestId)) {
+                            mappingResult.add(ArticleInterest.create(article, interestId));
+                            if (newArticle) {
+                                long count = articleCounts.getOrDefault(interestId, 0L);
+                                articleCounts.put(interestId, count + 1);
                             }
                         }
                     }
                     /* 관심사 키워드가 하나라도 매칭된 신규 기사만 저장 */
-                    if (newArticle && mapped) {
+                    if (newArticle && !matchedInterestIds.isEmpty()) {
                         result.add(article);
                     }
                 }
@@ -231,5 +215,25 @@ public class ArticleCollectService {
                 "기사 수집 및 저장 완료 - 신규 기사: {}건, 전체 소요시간: {}초",
                 result.size(),
                 (System.nanoTime() - saveStartedAt) / 1_000_000_000.0);
+    }
+
+    /* 가져온 관심사, 키워드 매핑정보들
+     * 기사들의 제목이랑 내용에 포함되는 확인,
+     * 포함되면 관심사 매핑하여 저장 */
+    private List<UUID> findInterestIdsByKeywordMatch(RawArticle article, List<InterestKeywordInfo> interests) {
+        String title = article.title().toLowerCase(Locale.ROOT);
+        String summary = article.summary().toLowerCase(Locale.ROOT);
+        List<UUID> matchedInterestIds = new ArrayList<>();
+
+        for (InterestKeywordInfo interest : interests) {
+            for (String keyword : interest.keywords()) {
+                String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
+                if (title.contains(lowerKeyword) || summary.contains(lowerKeyword)) {
+                    matchedInterestIds.add(interest.interestId());
+                    break;
+                }
+            }
+        }
+        return matchedInterestIds;
     }
 }
