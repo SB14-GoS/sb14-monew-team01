@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!-- 스프링 부트 기본 로깅 설정 포함 -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+  <!-- 기존 application.yml의 콘솔 패턴과 동일하게 유지 -->
+  <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"/>
+
+  <!-- 콘솔 출력 Appender -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <!-- 테스트 환경에서는 파일 생성을 아예 시도하지 않도록 CONSOLE만 사용 -->
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>
