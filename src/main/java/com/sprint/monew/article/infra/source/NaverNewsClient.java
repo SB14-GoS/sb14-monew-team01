@@ -23,6 +23,8 @@ import org.springframework.web.util.HtmlUtils;
 @RequiredArgsConstructor
 public class NaverNewsClient implements NewsSourceClient {
 
+    private final int pageSize = 100;
+
     private final RestClient restClient;
 
     @Override
@@ -55,10 +57,14 @@ public class NaverNewsClient implements NewsSourceClient {
                     if (response == null) {
                         throw new InvalidNaverNewsResponseException(keyword);
                     }
-                    if (response.items() == null || response.items().isEmpty()) {
-                        continue;
+                    List<NaverNewsItem> items = response.items();
+                    if (items == null || items.isEmpty()) {
+                        break;
                     }
                     responses.add(response);
+                    if (items.size() < pageSize) {
+                        break;
+                    }
                 }
 
                 /* TODO: 키워드별로 반복요청
