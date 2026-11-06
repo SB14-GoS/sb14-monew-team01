@@ -6,39 +6,18 @@
   <!-- 기존 application.yml의 콘솔 패턴과 동일하게 유지 -->
   <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%X{requestId:-}] [%X{clientIp:-}] [%15.15thread] %-40.40logger{39} : %msg%n"/>
 
-  <!-- 1. 콘솔 출력 Appender -->
+  <!-- 콘솔 출력 Appender -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>${LOG_PATTERN}</pattern>
     </encoder>
   </appender>
 
-  <!-- 2. 파일 출력 및 날짜별 롤링 Appender -->
-  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <!-- 오늘 날짜의 실시간 로그가 기록되는 기본 파일 -->
-    <file>${LOG_DIR}/monew.log</file>
-    <encoder>
-      <pattern>${LOG_PATTERN}</pattern>
-    </encoder>
-    <!-- 자정이 지나면 monew.2026-11-02.log 형태로 파일명을 변경하여 마감 -->
-    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-      <fileNamePattern>${LOG_DIR}/monew.%d{yyyy-MM-dd,Asia/Seoul}.log</fileNamePattern>
-      <!-- 서버 디스크 용량 관리를 위해 최근 14일 치 파일만 보관 -->
-      <maxHistory>14</maxHistory>
-    </rollingPolicy>
-  </appender>
-
-  <!-- 테스트(test) 실행 시에는 불필요한 로그 파일이 생기지 않도록 콘솔만 출력 -->
-  <springProfile name="test">
-    <root level="INFO">
-      <appender-ref ref="CONSOLE"/>
-    </root>
-  </springProfile>
-
-  <!-- 로컬(local) 및 운영(prod) 환경에서는 콘솔과 파일 모두 출력 -->
+  <!-- 모든 환경에서 파일 생성 없이 콘솔(CloudWatch)로만 출력 -->
   <springProfile name="!test">
     <root level="INFO">
       <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
     </root>
   </springProfile>
 </configuration>
