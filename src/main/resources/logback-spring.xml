@@ -17,7 +17,6 @@
   <springProfile name="!test">
     <root level="INFO">
       <appender-ref ref="CONSOLE"/>
-      <appender-ref ref="FILE"/>
     </root>
   </springProfile>
 </configuration>
