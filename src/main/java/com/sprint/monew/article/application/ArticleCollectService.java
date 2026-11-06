@@ -41,6 +41,8 @@ public class ArticleCollectService {
     private final ArticleInterestRepository articleInterestRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final int chunkSize = 1000;
+
     @Transactional
     /* 배치로 돌릴거 */
     public void save() {
@@ -129,8 +131,8 @@ public class ArticleCollectService {
         Map<UUID, Long> articleCounts = new HashMap<>();
 
         /* 1개씩 반복 조회하는거 1000개씩 반복 조회로 변경 */
-        for (int i = 0; i < totalResult.size(); i += 1000) {
-            int end = i + 1000;
+        for (int i = 0; i < totalResult.size(); i += chunkSize) {
+            int end = i + chunkSize;
             if (end > totalResult.size()) {
                 end = totalResult.size();
             }
