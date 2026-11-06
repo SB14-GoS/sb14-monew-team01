@@ -159,10 +159,10 @@ class NaverNewsClientTest {
     void collectsResultsFromEveryKeyword() {
         List<RawArticle> result = client.fetch(List.of("북한", "경제"));
 
-        assertThat(requests).hasSize(20);
+        assertThat(requests).hasSize(2);
         assertThat(URLDecoder.decode(requests.get(0).rawQuery(), StandardCharsets.UTF_8))
                 .startsWith("query=북한&");
-        assertThat(URLDecoder.decode(requests.get(10).rawQuery(), StandardCharsets.UTF_8))
+        assertThat(URLDecoder.decode(requests.get(1).rawQuery(), StandardCharsets.UTF_8))
                 .startsWith("query=경제&");
         assertThat(result)
                 .extracting(RawArticle::sourceUrl)
@@ -208,7 +208,7 @@ class NaverNewsClientTest {
         body = "{\"total\":0,\"items\":[]}";
 
         assertThat(client.fetch(List.of("북한"))).isEmpty();
-        assertThat(requests).hasSize(10);
+        assertThat(requests).hasSize(1);
     }
 
     @Test
@@ -226,7 +226,7 @@ class NaverNewsClientTest {
         body = responseBody;
 
         assertThat(client.fetch(List.of("북한", "경제"))).isEmpty();
-        assertThat(requests).hasSize(20);
+        assertThat(requests).hasSize(2);
     }
 
     @Test
