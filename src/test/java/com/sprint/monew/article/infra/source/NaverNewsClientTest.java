@@ -36,6 +36,7 @@ class NaverNewsClientTest {
     private volatile int status = 200;
     private volatile String body;
     private volatile String contentType = "application/json;charset=UTF-8";
+    private volatile boolean serveBodyOnEveryPage;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -55,7 +56,9 @@ class NaverNewsClientTest {
             if (status == 204) {
                 exchange.sendResponseHeaders(204, -1);
             } else {
-                byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                boolean firstPage = exchange.getRequestURI().getRawQuery().contains("&start=1&");
+                String responseBody = firstPage || serveBodyOnEveryPage ? body : "{\"items\":[]}";
+                byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(status, bytes.length);
                 exchange.getResponseBody().write(bytes);
             }
@@ -93,10 +96,10 @@ class NaverNewsClientTest {
     void sendsSearchParametersAndCredentials() {
         client.fetch(List.of("북한"));
 
-        assertThat(requests).singleElement().satisfies(request -> {
+        assertThat(requests).first().satisfies(request -> {
             assertThat(request.method()).isEqualTo("GET");
             assertThat(URLDecoder.decode(request.rawQuery(), StandardCharsets.UTF_8))
-                    .isEqualTo("query=북한&display=100&sort=date&format=json");
+                    .isEqualTo("query=북한&display=100&start=1&sort=date&format=json");
             assertThat(request.clientId()).isEqualTo("test-id");
             assertThat(request.clientSecret()).isEqualTo("test-secret");
         });
@@ -156,10 +159,10 @@ class NaverNewsClientTest {
     void collectsResultsFromEveryKeyword() {
         List<RawArticle> result = client.fetch(List.of("북한", "경제"));
 
-        assertThat(requests).hasSize(2);
+        assertThat(requests).hasSize(20);
         assertThat(URLDecoder.decode(requests.get(0).rawQuery(), StandardCharsets.UTF_8))
                 .startsWith("query=북한&");
-        assertThat(URLDecoder.decode(requests.get(1).rawQuery(), StandardCharsets.UTF_8))
+        assertThat(URLDecoder.decode(requests.get(10).rawQuery(), StandardCharsets.UTF_8))
                 .startsWith("query=경제&");
         assertThat(result)
                 .extracting(RawArticle::sourceUrl)
@@ -171,8 +174,8 @@ class NaverNewsClientTest {
     }
 
     @Test
-    @DisplayName("전체 검색 결과가 많아도 키워드별로 처음 100건만 한 번 요청한다")
-    void collectsOnlyFirstHundredResultsPerKeyword() {
+    @DisplayName("키워드별로 100건씩 열 페이지에서 최대 1,000건을 수집한다")
+    void collectsUpToOneThousandResultsPerKeyword() {
         String items = IntStream.rangeClosed(1, 100)
                 .mapToObj(id -> """
                         {"title":"경제 기사 %d","originallink":"https://publisher.example/articles/%d",
@@ -180,15 +183,16 @@ class NaverNewsClientTest {
                         """.formatted(id, id))
                 .collect(Collectors.joining(","));
         body = "{\"total\":10000,\"start\":1,\"display\":100,\"items\":[%s]}".formatted(items);
+        serveBodyOnEveryPage = true;
 
-        List<RawArticle> result = client.fetch(List.of("북한", "경제"));
+        List<RawArticle> result = client.fetch(List.of("경제"));
 
         assertThat(requests)
-                .extracting(Request::rawQuery)
-                .containsExactly(
-                        "query=%EB%B6%81%ED%95%9C&display=100&sort=date&format=json",
-                        "query=%EA%B2%BD%EC%A0%9C&display=100&sort=date&format=json");
-        assertThat(result).hasSize(200);
+                .extracting(request -> URLDecoder.decode(request.rawQuery(), StandardCharsets.UTF_8))
+                .containsExactlyElementsOf(IntStream.range(0, 10)
+                        .mapToObj(page -> "query=경제&display=100&start=" + (page * 100 + 1) + "&sort=date&format=json")
+                        .toList());
+        assertThat(result).hasSize(1000);
     }
 
     @Test
@@ -204,7 +208,7 @@ class NaverNewsClientTest {
         body = "{\"total\":0,\"items\":[]}";
 
         assertThat(client.fetch(List.of("북한"))).isEmpty();
-        assertThat(requests).hasSize(1);
+        assertThat(requests).hasSize(10);
     }
 
     @Test
@@ -222,7 +226,7 @@ class NaverNewsClientTest {
         body = responseBody;
 
         assertThat(client.fetch(List.of("북한", "경제"))).isEmpty();
-        assertThat(requests).hasSize(2);
+        assertThat(requests).hasSize(20);
     }
 
     @Test
