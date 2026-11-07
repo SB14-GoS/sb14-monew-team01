@@ -1,11 +1,11 @@
 package com.sprint.monew.article.infra.source;
 
-import com.sprint.monew.article.application.port.NewsSourceClient;
 import com.sprint.monew.article.application.port.RawArticle;
 import com.sprint.monew.article.domain.ArticleSource;
 import com.sprint.monew.article.domain.exception.InvalidNaverNewsResponseException;
 import com.sprint.monew.article.infra.source.dto.NaverNewsItem;
 import com.sprint.monew.article.infra.source.dto.NaverNewsResponse;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -21,24 +21,18 @@ import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @RequiredArgsConstructor
-public class NaverNewsClient implements NewsSourceClient {
+public class NaverNewsClient {
 
     private final int pageSize = 100;
 
     private final RestClient restClient;
 
-    @Override
-    public ArticleSource getSource() {
-        return ArticleSource.NAVER;
-    }
-
-    @Override
-    public List<RawArticle> fetch(Collection<String> keywords) {
+    public List<RawArticle> fetch(Collection<String> keywords, Instant publishedSince) {
         List<RawArticle> result = new ArrayList<>();
         for (String keyword : keywords) {
             log.debug("네이버 뉴스 수집 요청 - keyword: {}", keyword);
-            List<NaverNewsResponse> responses = new ArrayList<>();
             try {
+                pages:
                 for (int start = 1; start <= 901; start += 100) {
                     NaverNewsResponse response = restClient
                             .get()
@@ -61,19 +55,7 @@ public class NaverNewsClient implements NewsSourceClient {
                     if (items == null || items.isEmpty()) {
                         break;
                     }
-                    responses.add(response);
-                    if (items.size() < pageSize) {
-                        break;
-                    }
-                }
-
-                /* TODO: 키워드별로 반복요청
-                           ㄴ 페이지 반복 불러오기
-                                ㄴ 기사 변환 반복
-                   3중 for문 일단 냅두고 성능테스트 해보고 안된다 싶으면 리팩토링 예정
-                */
-                for (NaverNewsResponse response : responses) {
-                    for (NaverNewsItem item : response.items()) {
+                    for (NaverNewsItem item : items) {
                         /* 오리지널 링크 없으면 일반 링크로 대체 */
                         String originallink = item.originallink();
                         if (Objects.isNull(originallink) || originallink.isBlank()) {
@@ -83,6 +65,12 @@ public class NaverNewsClient implements NewsSourceClient {
                         if (Objects.isNull(originallink) || originallink.isBlank()) {
                             log.warn("링크 누락 기사 제외 - title: {}", item.title());
                             continue;
+                        }
+                        /* 기사 게시일이 db에 적재된 네이버의 최신 기사보다 오래됐으면 건너뜀 */
+                        Instant publishedAt = ZonedDateTime.parse(item.pubDate(), DateTimeFormatter.RFC_1123_DATE_TIME)
+                                .toInstant();
+                        if (publishedAt.isBefore(publishedSince)) {
+                            break pages;
                         }
                         /* 응답이 이런식으로 오기떄문에 걸러줘야함 html 태그 제거해줘야함
                         "title":"국감장서 '<b>북한<\/b> 지뢰' 꺼내든 박충권 &quot;장관 앞에 놔도 되냐&quot;…정동영 &quot;사...",
@@ -95,14 +83,12 @@ public class NaverNewsClient implements NewsSourceClient {
                         summary = summary.replace("<b>", "").replace("</b>", "");
                         summary = HtmlUtils.htmlUnescape(summary);
 
-                        RawArticle article = new RawArticle(
-                                ArticleSource.NAVER,
-                                originallink,
-                                title,
-                                ZonedDateTime.parse(item.pubDate(), DateTimeFormatter.RFC_1123_DATE_TIME)
-                                        .toInstant(),
-                                summary);
+                        RawArticle article =
+                                new RawArticle(ArticleSource.NAVER, originallink, title, publishedAt, summary);
                         result.add(article);
+                    }
+                    if (items.size() < pageSize) {
+                        break;
                     }
                 }
             } catch (RuntimeException e) {

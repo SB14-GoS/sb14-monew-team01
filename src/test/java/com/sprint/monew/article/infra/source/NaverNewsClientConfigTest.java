@@ -23,8 +23,7 @@ class NaverNewsClientConfigTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed().hasSingleBean(NaverNewsClient.class);
                     assertThat(context.getBeansOfType(NewsSourceClient.class))
-                            .containsOnlyKeys(
-                                    "naverNewsClient", "hankyungNewsClient", "chosunNewsClient", "yeonhapNewsClient");
+                            .containsOnlyKeys("hankyungNewsClient", "chosunNewsClient", "yeonhapNewsClient");
 
                     RestClient naverRestClient = context.getBean("naverRestClient", RestClient.class);
                     RestClient rssRestClient = context.getBean("rssRestClient", RestClient.class);
