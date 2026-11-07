@@ -35,7 +35,7 @@ public class ArticleMappingService {
     private final int chunkSize = 1000;
 
     @Transactional
-    public int saveChunk(List<RawArticle> totalResult, List<InterestKeywordInfo> keywordInfos) {
+    public int saveArticles(List<RawArticle> totalResult, List<InterestKeywordInfo> keywordInfos) {
         long stageStartedAt = System.nanoTime();
         /* 중복되는 링크 없이 하려고 중복을 허용하지 않는 Set<> 을사용 */
         Set<String> sourceUrl = new HashSet<>();

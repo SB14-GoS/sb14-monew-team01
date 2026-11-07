@@ -89,7 +89,8 @@ public class ArticleCollectService {
                 rssTotalResult.size(),
                 (System.nanoTime() - stageStartedAt) / 1_000_000_000.0);
 
-        int savedArticleCount = articleMappingService.saveChunk(totalResult, keywordInfos);
+        /* 기사랑 키워드 통째로 받고 한번에 저장하고 이벤트 발행 */
+        int savedArticleCount = articleMappingService.saveArticles(totalResult, keywordInfos);
 
         log.debug("기사 수집 후 처리 완료 - 소요시간: {}초", (System.nanoTime() - processStartedAt) / 1_000_000_000.0);
         log.info(
