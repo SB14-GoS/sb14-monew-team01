@@ -35,6 +35,7 @@ class NaverNewsClientTest {
     private final List<Request> requests = new CopyOnWriteArrayList<>();
     private volatile int status = 200;
     private volatile String body;
+    private volatile String nextPageBody = "{\"items\":[]}";
     private volatile String contentType = "application/json;charset=UTF-8";
     private volatile boolean serveBodyOnEveryPage;
 
@@ -57,7 +58,7 @@ class NaverNewsClientTest {
                 exchange.sendResponseHeaders(204, -1);
             } else {
                 boolean firstPage = exchange.getRequestURI().getRawQuery().contains("&start=1&");
-                String responseBody = firstPage || serveBodyOnEveryPage ? body : "{\"items\":[]}";
+                String responseBody = firstPage || serveBodyOnEveryPage ? body : nextPageBody;
                 byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(status, bytes.length);
                 exchange.getResponseBody().write(bytes);
@@ -83,18 +84,9 @@ class NaverNewsClientTest {
     }
 
     @Test
-    @DisplayName("네이버 뉴스 클라이언트의 수집 출처는 NAVER다")
-    void sourceIsNaver() {
-        ArticleSource result = client.getSource();
-
-        assertThat(result).isEqualTo(ArticleSource.NAVER);
-        assertThat(requests).isEmpty();
-    }
-
-    @Test
     @DisplayName("GET 요청에 검색 조건과 API HUB 인증 헤더를 담는다")
     void sendsSearchParametersAndCredentials() {
-        client.fetch(List.of("북한"));
+        client.fetch(List.of("북한"), Instant.MIN);
 
         assertThat(requests).first().satisfies(request -> {
             assertThat(request.method()).isEqualTo("GET");
@@ -108,7 +100,7 @@ class NaverNewsClientTest {
     @Test
     @DisplayName("공백·더하기·앰퍼샌드가 있는 검색어를 하나의 query 값으로 인코딩한다")
     void encodesSpecialCharactersInKeyword() {
-        client.fetch(List.of("C++ & 북한"));
+        client.fetch(List.of("C++ & 북한"), Instant.MIN);
 
         assertThat(requests.get(0).rawQuery()).startsWith("query=C%2B%2B%20%26%20%EB%B6%81%ED%95%9C&");
     }
@@ -116,7 +108,7 @@ class NaverNewsClientTest {
     @Test
     @DisplayName("JSON의 모든 기사를 원문 링크·출처·UTC 발행일을 갖는 RawArticle로 변환한다")
     void convertsEveryArticleAndUsesOriginalLink() {
-        List<RawArticle> result = client.fetch(List.of("북한"));
+        List<RawArticle> result = client.fetch(List.of("북한"), Instant.MIN);
 
         assertThat(result)
                 .containsExactly(
@@ -140,13 +132,13 @@ class NaverNewsClientTest {
     void readsJsonWithNonJsonContentType(String responseContentType) {
         contentType = responseContentType;
 
-        assertThat(client.fetch(List.of("북한"))).hasSize(2);
+        assertThat(client.fetch(List.of("북한"), Instant.MIN)).hasSize(2);
     }
 
     @Test
     @DisplayName("제목과 요약의 강조 태그를 제거하고 HTML 엔티티를 원래 문자로 바꾼다")
     void cleansTitleAndSummary() {
-        RawArticle article = client.fetch(List.of("북한")).get(0);
+        RawArticle article = client.fetch(List.of("북한"), Instant.MIN).get(0);
 
         assertThat(article.title()).isEqualTo("북한 관련 \"뉴스\" & 소식");
         assertThat(article.summary()).isEqualTo("<인터뷰> 북한 소식 '오늘'");
@@ -157,7 +149,7 @@ class NaverNewsClientTest {
     @Test
     @DisplayName("여러 키워드의 기사들을 하나의 결과 리스트에 순서대로 모은다")
     void collectsResultsFromEveryKeyword() {
-        List<RawArticle> result = client.fetch(List.of("북한", "경제"));
+        List<RawArticle> result = client.fetch(List.of("북한", "경제"), Instant.MIN);
 
         assertThat(requests).hasSize(2);
         assertThat(URLDecoder.decode(requests.get(0).rawQuery(), StandardCharsets.UTF_8))
@@ -185,7 +177,7 @@ class NaverNewsClientTest {
         body = "{\"total\":10000,\"start\":1,\"display\":100,\"items\":[%s]}".formatted(items);
         serveBodyOnEveryPage = true;
 
-        List<RawArticle> result = client.fetch(List.of("경제"));
+        List<RawArticle> result = client.fetch(List.of("경제"), Instant.MIN);
 
         assertThat(requests)
                 .extracting(request -> URLDecoder.decode(request.rawQuery(), StandardCharsets.UTF_8))
@@ -196,9 +188,41 @@ class NaverNewsClientTest {
     }
 
     @Test
+    @DisplayName("기준 시각의 기사까지 포함하고 오래된 기사가 나온 페이지 이후에는 요청하지 않는다")
+    void stopsPagingAtPublicationCutoff() {
+        Instant cutoff = Instant.parse("2026-10-28T01:00:00Z");
+        String item = """
+                {"title":"경제 기사","originallink":"https://publisher.example/articles/%d",
+                 "pubDate":"Wed, 28 Oct 2026 %s +0900"}
+                """;
+        body = pageWithItems(IntStream.rangeClosed(1, 100)
+                .mapToObj(id -> item.formatted(id, "10:44:00"))
+                .collect(Collectors.joining(",")));
+        nextPageBody = pageWithItems(IntStream.rangeClosed(101, 200)
+                .mapToObj(id -> item.formatted(id, id == 101 ? "10:00:00" : "09:59:59"))
+                .collect(Collectors.joining(",")));
+
+        List<RawArticle> result = client.fetch(List.of("경제"), cutoff);
+
+        assertThat(requests)
+                .extracting(Request::rawQuery)
+                .satisfiesExactly(
+                        first -> assertThat(first).contains("&start=1&"),
+                        second -> assertThat(second).contains("&start=101&"));
+        assertThat(result).hasSize(101).last().satisfies(article -> {
+            assertThat(article.sourceUrl()).endsWith("/101");
+            assertThat(article.publishDate()).isEqualTo(cutoff);
+        });
+    }
+
+    private static String pageWithItems(String items) {
+        return "{\"items\":[%s]}".formatted(items);
+    }
+
+    @Test
     @DisplayName("키워드가 없으면 네이버를 호출하지 않고 빈 리스트를 반환한다")
     void emptyKeywordsDoNotSendRequest() {
-        assertThat(client.fetch(List.of())).isEmpty();
+        assertThat(client.fetch(List.of(), Instant.MIN)).isEmpty();
         assertThat(requests).isEmpty();
     }
 
@@ -207,7 +231,7 @@ class NaverNewsClientTest {
     void emptyItemsAreAValidResponse() {
         body = "{\"total\":0,\"items\":[]}";
 
-        assertThat(client.fetch(List.of("북한"))).isEmpty();
+        assertThat(client.fetch(List.of("북한"), Instant.MIN)).isEmpty();
         assertThat(requests).hasSize(1);
     }
 
@@ -225,7 +249,7 @@ class NaverNewsClientTest {
     void missingItemsAreEmptyResults(String responseBody) {
         body = responseBody;
 
-        assertThat(client.fetch(List.of("북한", "경제"))).isEmpty();
+        assertThat(client.fetch(List.of("북한", "경제"), Instant.MIN)).isEmpty();
         assertThat(requests).hasSize(2);
     }
 
@@ -249,14 +273,14 @@ class NaverNewsClientTest {
                 }]}
                 """.formatted(descriptionField);
 
-        assertThat(client.fetch(List.of("경제"))).singleElement().satisfies(article -> {
+        assertThat(client.fetch(List.of("경제"), Instant.MIN)).singleElement().satisfies(article -> {
             assertThat(article.title()).isEqualTo("기사 제목");
             assertThat(article.summary()).isEmpty();
         });
     }
 
     private void assertInvalidResponse() {
-        assertThatThrownBy(() -> client.fetch(List.of("북한")))
+        assertThatThrownBy(() -> client.fetch(List.of("북한"), Instant.MIN))
                 .isInstanceOfSatisfying(InvalidNaverNewsResponseException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(ArticleErrorCode.INVALID_NAVER_NEWS_RESPONSE);
                     assertThat(exception.getErrorCode().getStatus().value()).isEqualTo(502);
@@ -271,7 +295,7 @@ class NaverNewsClientTest {
         status = responseStatus;
         body = "{\"error\":{\"message\":\"upstream failure\"}}";
 
-        assertThatThrownBy(() -> client.fetch(List.of("북한")))
+        assertThatThrownBy(() -> client.fetch(List.of("북한"), Instant.MIN))
                 .isInstanceOfSatisfying(
                         RestClientResponseException.class,
                         exception ->
@@ -284,7 +308,7 @@ class NaverNewsClientTest {
     void malformedJsonIsNotAnEmptyResult() {
         body = "{broken-json";
 
-        assertThatThrownBy(() -> client.fetch(List.of("북한"))).isInstanceOf(RestClientException.class);
+        assertThatThrownBy(() -> client.fetch(List.of("북한"), Instant.MIN)).isInstanceOf(RestClientException.class);
     }
 
     @Test
@@ -292,7 +316,7 @@ class NaverNewsClientTest {
     void malformedDateIsNotAnEmptyResult() {
         body = body.replace("Wed, 28 Oct 2026 10:44:00 +0900", "invalid-date");
 
-        assertThatThrownBy(() -> client.fetch(List.of("북한"))).isInstanceOf(DateTimeParseException.class);
+        assertThatThrownBy(() -> client.fetch(List.of("북한"), Instant.MIN)).isInstanceOf(DateTimeParseException.class);
     }
 
     @Test
@@ -301,11 +325,14 @@ class NaverNewsClientTest {
     void fetchesFromPostmanSimulation() {
         NaverNewsClient simulated = clientPointingTo(System.getenv("NAVER_SIMULATION_URL"));
 
-        assertThat(simulated.fetch(List.of("북한"))).hasSize(2).first().satisfies(article -> {
-            assertThat(article.articleSource()).isEqualTo(ArticleSource.NAVER);
-            assertThat(article.sourceUrl()).isEqualTo("https://publisher.example/articles/1");
-            assertThat(article.title()).isEqualTo("북한 관련 \"뉴스\" & 소식");
-        });
+        assertThat(simulated.fetch(List.of("북한"), Instant.MIN))
+                .hasSize(2)
+                .first()
+                .satisfies(article -> {
+                    assertThat(article.articleSource()).isEqualTo(ArticleSource.NAVER);
+                    assertThat(article.sourceUrl()).isEqualTo("https://publisher.example/articles/1");
+                    assertThat(article.title()).isEqualTo("북한 관련 \"뉴스\" & 소식");
+                });
     }
 
     private record Request(String method, String rawQuery, String clientId, String clientSecret) {}

@@ -1,10 +1,13 @@
 package com.sprint.monew.article.application;
 
 import com.sprint.monew.article.application.port.RawArticle;
+import com.sprint.monew.article.domain.Article;
+import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.infra.source.NaverNewsClient;
 import com.sprint.monew.article.infra.source.RssNewsClient;
 import com.sprint.monew.interest.api.InterestKeywordInfo;
 import com.sprint.monew.interest.api.InterestQueryApi;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +29,7 @@ public class ArticleCollectService {
     private final RssNewsClient hankyungNewsClient;
     private final InterestQueryApi interestQueryApi;
     private final ArticleMappingService articleMappingService;
+    private final ArticleRepository articleRepository;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     /* 배치로 돌릴거 */
@@ -44,11 +48,16 @@ public class ArticleCollectService {
         int savedArticleCount = 0;
 
         long collectNaverStartedAt = System.nanoTime();
+        /* db에 저장된 네이버 최신기사 하나 가져와서 게시일 파싱*/
+        Instant latestNaverPublishedAt = articleRepository
+                .findLatestNaverArticle()
+                .map(Article::getPublishedDate)
+                .orElse(Instant.MIN);
         try {
             for (String keyword : keywords) {
                 List<RawArticle> naverRawArticles;
                 try {
-                    naverRawArticles = naverNewsClient.fetch(List.of(keyword));
+                    naverRawArticles = naverNewsClient.fetch(List.of(keyword), latestNaverPublishedAt);
                 } catch (RuntimeException e) {
                     log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
                     break;

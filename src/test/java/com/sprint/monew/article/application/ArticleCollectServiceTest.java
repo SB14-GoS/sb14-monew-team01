@@ -24,12 +24,14 @@ import com.sprint.monew.interest.api.InterestQueryApi;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -73,7 +75,7 @@ class ArticleCollectServiceTest {
         Set<String> keywords = Set.of("경제");
         given(interestQueryApi.getAllKeywords())
                 .willReturn(List.of(new InterestKeywordInfo(interestId, "경제", List.of("경제"))));
-        given(naverNewsClient.fetch(List.of("경제"))).willThrow(failure);
+        given(naverNewsClient.fetch(List.of("경제"), Instant.MIN)).willThrow(failure);
         given(chosunNewsClient.fetch(keywords)).willThrow(failure);
         given(yeonhapNewsClient.fetch(keywords)).willThrow(failure);
         given(hankyungNewsClient.fetch(keywords)).willThrow(failure);
@@ -112,21 +114,27 @@ class ArticleCollectServiceTest {
         }
     }
 
-    @Test
-    void collectsNaverPerKeywordAndSavesAllSources() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void collectsNaverPerKeywordAndSavesAllSources(boolean hasSavedNaverArticles) {
+        List<RawArticle> naverArticles = articles(ArticleSource.NAVER, 2);
+        RawArticle latestArticle = naverArticles.get(0);
+        given(articleRepository.findLatestNaverArticle())
+                .willReturn(hasSavedNaverArticles ? Optional.of(existingArticle(latestArticle)) : Optional.empty());
+        Instant latestNaverPublishedAt = hasSavedNaverArticles ? latestArticle.publishDate() : Instant.MIN;
         Set<String> keywords = Set.of("경제", "기사");
         given(interestQueryApi.getAllKeywords())
                 .willReturn(List.of(new InterestKeywordInfo(interestId, "경제", List.of("경제", "기사"))));
-        List<RawArticle> naverArticles = articles(ArticleSource.NAVER, 2);
-        given(naverNewsClient.fetch(List.of("경제"))).willReturn(List.of(naverArticles.get(0)));
-        given(naverNewsClient.fetch(List.of("기사"))).willReturn(List.of(naverArticles.get(1)));
+        given(naverNewsClient.fetch(List.of("경제"), latestNaverPublishedAt)).willReturn(List.of(naverArticles.get(0)));
+        given(naverNewsClient.fetch(List.of("기사"), latestNaverPublishedAt)).willReturn(List.of(naverArticles.get(1)));
         given(chosunNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.CHOSUN, 1));
         given(yeonhapNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.YEONHAP, 3));
         given(hankyungNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.HANKYUNG, 2));
         service().save();
 
-        verify(naverNewsClient).fetch(List.of("경제"));
-        verify(naverNewsClient).fetch(List.of("기사"));
+        verify(articleRepository).findLatestNaverArticle();
+        verify(naverNewsClient).fetch(List.of("경제"), latestNaverPublishedAt);
+        verify(naverNewsClient).fetch(List.of("기사"), latestNaverPublishedAt);
         verify(chosunNewsClient).fetch(keywords);
         verify(yeonhapNewsClient).fetch(keywords);
         verify(hankyungNewsClient).fetch(keywords);
@@ -204,8 +212,8 @@ class ArticleCollectServiceTest {
     private void collect(List<RawArticle> articles) {
         given(interestQueryApi.getAllKeywords())
                 .willReturn(List.of(new InterestKeywordInfo(interestId, "경제", List.of("경제", "기사"))));
-        given(naverNewsClient.fetch(List.of("경제"))).willReturn(articles);
-        given(naverNewsClient.fetch(List.of("기사"))).willReturn(List.of());
+        given(naverNewsClient.fetch(List.of("경제"), Instant.MIN)).willReturn(articles);
+        given(naverNewsClient.fetch(List.of("기사"), Instant.MIN)).willReturn(List.of());
         service().save();
     }
 
@@ -223,7 +231,8 @@ class ArticleCollectServiceTest {
                 yeonhapNewsClient,
                 hankyungNewsClient,
                 interestQueryApi,
-                new ArticleMappingService(articleRepository, articleInterestRepository, eventPublisher));
+                new ArticleMappingService(articleRepository, articleInterestRepository, eventPublisher),
+                articleRepository);
     }
 
     private static List<RawArticle> articles(ArticleSource source, int count) {
