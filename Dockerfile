@@ -5,4 +5,4 @@ RUN mkdir -p /app/logs && chown app:app /app/logs
 COPY --chown=app:app build/libs/*SNAPSHOT.jar app.jar
 EXPOSE 8080
 USER app
-ENTRYPOINT ["java", "-Dspring.profiles.active=prod", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xmx400m", "-Dspring.profiles.active=prod", "-jar", "app.jar"]
