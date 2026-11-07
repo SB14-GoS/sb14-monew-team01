@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -26,7 +27,7 @@ public class ArticleCollectService {
     private final InterestQueryApi interestQueryApi;
     private final ArticleMappingService articleMappingService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     /* 배치로 돌릴거 */
     public void save() {
         long saveStartedAt = System.nanoTime();
@@ -38,16 +39,35 @@ public class ArticleCollectService {
                 .flatMap(keyword -> keyword.keywords().stream())
                 .collect(Collectors.toSet());
 
-        List<RawArticle> totalResult = new ArrayList<>();
+        List<RawArticle> chunkedArticles = new ArrayList<>();
+        int naverArticleCount = 0;
+        int savedArticleCount = 0;
+
         long collectNaverStartedAt = System.nanoTime();
         try {
-            totalResult.addAll(naverNewsClient.fetch(keywords));
-        } catch (RuntimeException e) {
-            log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
+            for (String keyword : keywords) {
+                List<RawArticle> naverRawArticles;
+                try {
+                    naverRawArticles = naverNewsClient.fetch(List.of(keyword));
+                } catch (RuntimeException e) {
+                    log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
+                    break;
+                }
+                naverArticleCount += naverRawArticles.size();
+
+                for (RawArticle each : naverRawArticles) {
+                    chunkedArticles.add(each);
+
+                    if (chunkedArticles.size() == 5000) {
+                        savedArticleCount += articleMappingService.saveArticles(chunkedArticles, keywordInfos);
+                        chunkedArticles.clear();
+                    }
+                }
+            }
         } finally {
             log.info(
                     "네이버 기사 수집 종료 - 기사: {}건, 소요시간: {}초",
-                    totalResult.size(),
+                    naverArticleCount,
                     (System.nanoTime() - collectNaverStartedAt) / 1_000_000_000.0);
         }
 
@@ -82,15 +102,15 @@ public class ArticleCollectService {
         long processStartedAt = System.nanoTime();
         long stageStartedAt = processStartedAt;
         /* 제목이나 내용에 db에 있는 키워드와 매칭이 되는애들을 추가 */
-        totalResult.addAll(articleMappingService.filteringRssArticles(rssTotalResult, keywords));
+        chunkedArticles.addAll(articleMappingService.filteringRssArticles(rssTotalResult, keywords));
 
         log.debug(
                 "RSS 키워드 필터링 완료 - 대상: {}건, 소요시간: {}초",
                 rssTotalResult.size(),
                 (System.nanoTime() - stageStartedAt) / 1_000_000_000.0);
 
-        /* 기사랑 키워드 통째로 받고 한번에 저장하고 이벤트 발행 */
-        int savedArticleCount = articleMappingService.saveArticles(totalResult, keywordInfos);
+        /* 네이버 수집 후 남은 기사와 필터링한 RSS 기사를 저장 */
+        savedArticleCount += articleMappingService.saveArticles(chunkedArticles, keywordInfos);
 
         log.debug("기사 수집 후 처리 완료 - 소요시간: {}초", (System.nanoTime() - processStartedAt) / 1_000_000_000.0);
         log.info(
