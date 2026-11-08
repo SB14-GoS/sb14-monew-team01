@@ -4,14 +4,14 @@
 
 모뉴는 네이버 뉴스와 한국경제·조선일보·연합뉴스 RSS에서 매시간 기사를 수집합니다. 관심사를 구독하면 해당 주제의 키워드와 맞는 기사만 모아 볼 수 있습니다.
 
-[서비스 체험](https://monew.project-archive.site/) · [로컬에서 실행하기](#빠른-시작) · [개발 문서](#팀-문서)
+[서비스 체험](https://monew.project-archive.site/) · [로컬에서 실행하기](#빠른-시작) · [개발 문서](#개발-문서)
 
 ![모뉴 메인 화면](docs/images/main.png)
 
 ## 모뉴에서 할 수 있는 일
 
-1. **관심사를 구독합니다.** 예를 들어 ‘인공지능’을 구독해 그 주제의 기사만 볼 수 있습니다. 원하는 주제가 없으면 ‘AI’, ‘생성형 AI’ 같은 키워드를 넣어 새 관심사를 등록합니다.
-2. **기사에 의견을 남깁니다.** 읽은 기사에 댓글을 달거나 다른 댓글에 좋아요를 누를 수 있습니다.
+1. **관심사를 구독합니다.** 기존 관심사에서 ‘인공지능’을 구독하거나, 원하는 주제가 없으면 ‘AI’, ‘생성형 AI’ 같은 키워드를 넣어 새 관심사를 등록합니다.
+2. **기사에 의견을 남깁니다.** 기사에 댓글을 달거나 댓글에 좋아요를 누를 수 있습니다. 댓글은 최신순과 좋아요순으로 볼 수 있습니다.
 3. **새 소식과 내 활동을 확인합니다.** 구독한 주제에 새 기사가 올라오거나 내 댓글에 좋아요가 달리면 알림을 받습니다. 구독, 읽은 기사, 최근 댓글과 좋아요는 활동 내역에서 다시 볼 수 있습니다.
 
 <details>
@@ -56,6 +56,18 @@ curl -fsS http://localhost:8080/api/articles/sources
 
 네이버 뉴스 수집이나 S3 연동이 필요하면 `.env.example`을 `.env`로 복사한 뒤 해당 기능에 필요한 `NAVER_*`, `AWS_*` 값을 채웁니다. 기본 실행에는 별도 DB 접속 정보가 필요하지 않습니다. [환경변수 예시](.env.example) · [온보딩 가이드](docs/ONBOARDING.md)
 
+## 기술 스택
+
+| 분야 | 기술 |
+| --- | --- |
+| 백엔드 | Java 17, Spring Boot 4.1, Spring MVC, JPA·Hibernate, QueryDSL, Spring Batch |
+| 데이터 | PostgreSQL, MongoDB Atlas, Amazon S3 |
+| 인프라·배포 | Amazon ECS(EC2), ECR, RDS, CloudFront, Route 53, GitHub Actions |
+| 모니터링 | Spring Boot Actuator, Micrometer, Amazon CloudWatch Logs |
+| 테스트·품질 | JUnit Jupiter, Mockito, Testcontainers, ArchUnit, JaCoCo, Spotless |
+| 개발 환경 | Gradle, Docker Compose, IntelliJ IDEA |
+| 협업·API 문서 | GitHub, Notion, CodeRabbit, Swagger UI |
+
 ## 시스템 구성
 
 ```mermaid
@@ -71,71 +83,33 @@ flowchart LR
     ECR -->|컨테이너 이미지| App
 ```
 
-기사와 관심사 등 서비스의 원본 데이터는 PostgreSQL에 저장합니다. 활동 화면에 필요한 데이터는 MongoDB에 사용자별로 모아 둡니다. Spring Batch로 기사 수집과 백업을 실행하고, GitHub Actions로 백엔드 이미지를 빌드해 ECS에 배포합니다. [ERD](docs/images/erd.png) · [배포 워크플로](.github/workflows/cd.yml)
+## ERD
 
-| 영역 | 기술 |
-| --- | --- |
-| 백엔드 | Java 17, Spring Boot, Spring Data JPA, QueryDSL, Spring Batch |
-| 데이터 | PostgreSQL, MongoDB |
-| 실행 및 배포 | Docker Compose, GitHub Actions, AWS ECS·ECR·S3·CloudFront |
-| 테스트 | JUnit, Testcontainers, ArchUnit, JaCoCo |
+![모뉴 PostgreSQL 테이블과 MongoDB 활동 내역 문서의 관계](docs/images/erd.png)
 
-## 기술 사례
+[Excalidraw 편집용 원본](docs/erd.excalidraw)
 
-<details>
-<summary>기사 수집·조회, 활동 내역, 로그인 개선 사례 보기</summary>
+## 테스트
 
-### 기사 수집 중 메모리에 쌓이는 데이터 줄이기
-
-네이버 검색 결과를 키워드별로 받아 한꺼번에 저장하는 구조에서는 수집량이 늘수록 메모리에 쌓이는 기사도 늘었습니다. 수집 중 **5,000건이 모일 때마다 저장 로직에 넘기고 버퍼를 비우도록** 변경했습니다. 기존 기사와 관심사 연결도 한 건씩 확인하던 방식에서 **최대 1,000건씩 묶어 조회**하는 방식으로 바꿨습니다. [수집 로직 변경](https://github.com/SB14-GoS/sb14-monew-team01/commit/a868ccbf53f3dd610a1aaba852fe4cce46fab336) · [관련 이슈 #184](https://github.com/SB14-GoS/sb14-monew-team01/issues/184)
-
-### 기사 50만 건에서 날짜순 목록 조회 개선
-
-발행일로 정렬하는 쿼리에 `(published_date, created_at, id)` 복합 인덱스를 추가하고, 다음 페이지를 찾는 커서 조건도 같은 컬럼 순서로 비교하도록 바꿨습니다.
-
-| 기사 50만 건 기준 | 변경 전 | 변경 후 |
-| --- | ---: | ---: |
-| 첫 페이지 | 35.248 ms | 0.036 ms |
-| 중간 페이지 | 33.385 ms | 0.056 ms |
-
-PR에 기록된 로컬 쿼리 실행 시간의 중앙값입니다. [측정 결과와 구현 PR #182](https://github.com/SB14-GoS/sb14-monew-team01/pull/182)
-
-### 활동 내역 화면에 필요한 조회를 한 번으로 줄이기
-
-구독, 댓글, 좋아요, 읽은 기사를 각각 조회하던 화면을 사용자당 MongoDB 문서 하나로 제공하도록 바꿨습니다. 원본 데이터가 커밋된 뒤 이벤트를 받아 문서를 갱신합니다. 댓글과 읽은 기사가 각 1,000건인 사용자 기준으로 **DB 조회가 5회에서 1회**로 줄었고, 로컬 Testcontainers에서 측정한 **p95는 7.6 ms에서 2.6 ms**로 줄었습니다. 워밍업 20회 후 100회 측정한 결과입니다. [조회 모델 이슈 #44](https://github.com/SB14-GoS/sb14-monew-team01/issues/44)
-
-### 로그인 실패 응답의 시간 차이 줄이기
-
-존재하지 않는 이메일로 로그인하면 비밀번호 검증을 건너뛰어 더 빨리 실패했습니다. 존재하지 않는 이메일에도 더미 해시로 비밀번호 검증을 수행하고 실패 메시지를 통일했습니다. 로컬 BCrypt 측정에서 두 실패 경로의 중앙값 차이가 **약 66.7 ms에서 1.5 ms**로 줄었습니다. DB 조회를 제외하고 워밍업 20회 후 100회 측정했습니다. [로그인 이슈 #13](https://github.com/SB14-GoS/sb14-monew-team01/issues/13)
-
-</details>
-
-## 개발과 테스트
+**전체 테스트 커버리지 87.54%** (JaCoCo, 2026년 11월 9일 GitHub Actions 측정). [CI 커버리지 결과](https://github.com/SB14-GoS/sb14-monew-team01/pull/195#issuecomment-6723138502)
 
 ```bash
-./gradlew test   # 테스트 실행 및 JaCoCo 리포트 생성
+./gradlew test   # 단위·통합 테스트와 커버리지 리포트 생성
 ./gradlew build  # 포맷 검사, 테스트, 빌드
 ```
 
-통합 테스트는 Testcontainers로 PostgreSQL과 MongoDB를 실행합니다. 코드는 기능별로 나누며, 다른 도메인에 공개하는 계약은 `api` 패키지에 둡니다. ArchUnit 테스트로 모듈 간 순환 의존과 계층 의존 규칙을 검사합니다. [백엔드 패키지](src/main/java/com/sprint/monew) · [CI 워크플로](.github/workflows/ci.yml)
+통합 테스트는 Testcontainers로 PostgreSQL과 MongoDB를 실행합니다. 로컬 커버리지 리포트는 `build/reports/jacoco/test/html/index.html`에서 확인할 수 있습니다.
 
-## 팀 문서
+## 개발 문서
 
 | 구분 | 문서 |
 | --- | --- |
 | 요구사항과 API | [프로젝트 요구사항](https://codeit.notion.site/MongoDB-PostgreSQL-v2-3276fd228e8d81c89265f6b5469efbb0) · [코드잇 제공 API 명세](http://sprint-project-1196140422.ap-northeast-2.elb.amazonaws.com/sb/monew/api/swagger-ui/index.html) |
-| 데이터 설계 | [ERD](docs/images/erd.png) |
-| 개발 가이드 | [온보딩](docs/ONBOARDING.md) · [공통 예외 처리](src/main/java/com/sprint/monew/global/exception/EXCEPTION_HANDLING.md) |
+| 개발 가이드 | [공통 예외 처리](src/main/java/com/sprint/monew/global/exception/EXCEPTION_HANDLING.md) · [CI](.github/workflows/ci.yml) · [CD](.github/workflows/cd.yml) |
 | 협업 | [협업 규칙](CONTRIBUTING.md) · [팀 노션](https://various-smoke-6b3.notion.site/Notion-SB14-MoNew-Team-ec6ff2cbac808318a03e015d40fea585) |
 
-## 팀원과 역할
+## 팀
 
-SB14 중급 프로젝트 · Team 01 · 백엔드 5명 · 2026.10.20–2026.11.09
+SB14 중급 프로젝트 · Team 01 · 2026.10.20–2026.11.09
 
-| 팀원 | 담당 | GitHub |
-| --- | --- | --- |
-| 김예준 · 팀장 | 초기 세팅, CI, 활동 내역, 기사 조회수, 기사 백업·복구, 알림 조회 | [@kim-yejunn](https://github.com/kim-yejunn) |
-| 김어진 | 공통 예외, 뉴스 기사, 뉴스 수집 | [@rladjwls02](https://github.com/rladjwls02) |
-| 배원기 | 사용자, 탈퇴 사용자 정리 배치, README, 일정 관리 | [@wongibae](https://github.com/wongibae) |
-| 신상엽 | 관심사·구독, 알림 생성, 배치 메트릭, 로그 S3 적재, AWS 인프라·배포 | [@Smil-limS](https://github.com/Smil-limS) |
-| 조예준 | 댓글·좋아요, 알림 정리 배치 | [@joyejun](https://github.com/joyejun) |
+[김예준](https://github.com/kim-yejunn) · [김어진](https://github.com/rladjwls02) · [배원기](https://github.com/wongibae) · [신상엽](https://github.com/Smil-limS) · [조예준](https://github.com/joyejun)
