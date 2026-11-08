@@ -4,7 +4,7 @@
 
 모뉴는 네이버 뉴스와 한국경제·조선일보·연합뉴스 RSS에서 매시간 기사를 수집합니다. 관심사를 구독하면 해당 주제의 키워드와 맞는 기사만 모아 볼 수 있습니다.
 
-[서비스 체험](https://monew.project-archive.site/) · [로컬에서 실행하기](#빠른-시작) · [개발 문서](#개발-문서)
+[서비스 체험](https://monew.project-archive.site/) · [시스템 설계](#시스템-설계) · [로컬 실행](#로컬-실행) · [개발 문서](#개발-문서)
 
 ![모뉴 메인 화면](docs/images/main.png)
 
@@ -35,7 +35,41 @@
 
 </details>
 
-## 빠른 시작
+## 기술 스택
+
+| 분야 | 기술 |
+| --- | --- |
+| 백엔드 | Java 17, Spring Boot 4.1, Spring MVC, JPA·Hibernate, QueryDSL, Spring Batch |
+| 데이터 | PostgreSQL, MongoDB Atlas, Amazon S3 |
+| 인프라·배포 | Amazon ECS(EC2), ECR, RDS, CloudFront, Route 53, GitHub Actions |
+| 모니터링 | Spring Boot Actuator, Micrometer, Amazon CloudWatch Logs |
+| 테스트·품질 | JUnit Jupiter, Mockito, Testcontainers, ArchUnit, JaCoCo, Spotless |
+| 개발 환경 | Gradle, Docker Compose, IntelliJ IDEA |
+| 협업·API 문서 | GitHub, Notion, CodeRabbit, Swagger UI |
+
+## 시스템 설계
+
+### 시스템 구성
+
+![CloudFront에서 웹 화면과 API 요청을 분기하고, 백엔드가 데이터 저장소와 뉴스 출처에 연결되는 구조](docs/images/system-architecture.png)
+
+[시스템 구성 Excalidraw 원본](docs/system-architecture.excalidraw)
+
+### 데이터 관계도 (ERD)
+
+![사용자·관심사·기사와 연결된 테이블, MongoDB 활동 내역 문서의 관계](docs/images/erd.png)
+
+[ERD Excalidraw 원본](docs/erd.excalidraw)
+
+### 배포 흐름
+
+![PR과 dev 푸시에서 CI를 실행하고 main 푸시에서 ECR을 거쳐 ECS에 백엔드를 배포하는 흐름](docs/images/deployment.png)
+
+[배포 흐름 Excalidraw 원본](docs/deployment.excalidraw)
+
+## 로컬 개발
+
+### 로컬 실행
 
 JDK 17과 Docker가 필요합니다. Docker를 실행한 뒤 아래 명령을 실행하세요. 기본 `local` 프로필에서는 Docker Compose가 PostgreSQL과 MongoDB를 자동으로 시작합니다.
 
@@ -56,40 +90,7 @@ curl -fsS http://localhost:8080/api/articles/sources
 
 네이버 뉴스 수집이나 S3 연동이 필요하면 `.env.example`을 `.env`로 복사한 뒤 해당 기능에 필요한 `NAVER_*`, `AWS_*` 값을 채웁니다. 기본 실행에는 별도 DB 접속 정보가 필요하지 않습니다. [환경변수 예시](.env.example) · [온보딩 가이드](docs/ONBOARDING.md)
 
-## 기술 스택
-
-| 분야 | 기술 |
-| --- | --- |
-| 백엔드 | Java 17, Spring Boot 4.1, Spring MVC, JPA·Hibernate, QueryDSL, Spring Batch |
-| 데이터 | PostgreSQL, MongoDB Atlas, Amazon S3 |
-| 인프라·배포 | Amazon ECS(EC2), ECR, RDS, CloudFront, Route 53, GitHub Actions |
-| 모니터링 | Spring Boot Actuator, Micrometer, Amazon CloudWatch Logs |
-| 테스트·품질 | JUnit Jupiter, Mockito, Testcontainers, ArchUnit, JaCoCo, Spotless |
-| 개발 환경 | Gradle, Docker Compose, IntelliJ IDEA |
-| 협업·API 문서 | GitHub, Notion, CodeRabbit, Swagger UI |
-
-## 시스템 구성
-
-```mermaid
-flowchart LR
-    User[사용자] --> CDN[CloudFront]
-    CDN -->|웹 화면| Web[(S3 정적 파일)]
-    CDN -->|API 요청| App[Spring Boot · ECS on EC2]
-    App --> DB[(PostgreSQL · RDS)]
-    App --> Activity[(MongoDB · Atlas)]
-    App --> Backup[(S3 기사 백업)]
-    App -->|매시간 수집| News[네이버 뉴스 API · RSS]
-    Actions[GitHub Actions] -->|이미지 푸시| ECR[AWS ECR]
-    ECR -->|컨테이너 이미지| App
-```
-
-## ERD
-
-![모뉴 PostgreSQL 테이블과 MongoDB 활동 내역 문서의 관계](docs/images/erd.png)
-
-[Excalidraw 편집용 원본](docs/erd.excalidraw)
-
-## 테스트
+### 테스트와 커버리지
 
 **전체 테스트 커버리지 87.54%** (JaCoCo, 2026년 11월 9일 GitHub Actions 측정). [CI 커버리지 결과](https://github.com/SB14-GoS/sb14-monew-team01/pull/195#issuecomment-6723138502)
 
