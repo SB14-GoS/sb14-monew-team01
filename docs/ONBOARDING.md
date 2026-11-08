@@ -131,6 +131,6 @@ git push --force-with-lease      # 내 브랜치에만 사용. dev/main에는 �
 
 ## 참고 문서
 
-- [협업 규칙 (CONTRIBUTING.md)](../CONTRIBUTING.md)
+- [개발 규칙](../README.md#개발-규칙)
 - [요구사항](https://codeit.notion.site/MongoDB-PostgreSQL-v2-3276fd228e8d81c89265f6b5469efbb0)
 - [API 명세 (Swagger)](http://sprint-project-1196140422.ap-northeast-2.elb.amazonaws.com/sb/monew/api/swagger-ui/index.html)
