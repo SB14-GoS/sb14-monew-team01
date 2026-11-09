@@ -1,7 +1,6 @@
 package com.sprint.monew.article.application;
 
 import com.sprint.monew.article.application.port.RawArticle;
-import com.sprint.monew.article.domain.Article;
 import com.sprint.monew.article.domain.repository.ArticleRepository;
 import com.sprint.monew.article.infra.source.NaverNewsClient;
 import com.sprint.monew.article.infra.source.RssNewsClient;
@@ -9,7 +8,9 @@ import com.sprint.monew.interest.api.InterestKeywordInfo;
 import com.sprint.monew.interest.api.InterestQueryApi;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -48,19 +49,22 @@ public class ArticleCollectService {
         int savedArticleCount = 0;
 
         long collectNaverStartedAt = System.nanoTime();
-        /* db에 저장된 네이버 최신기사 하나 가져와서 게시일 파싱*/
-        Instant latestNaverPublishedAt = articleRepository
-                .findLatestNaverArticle()
-                .map(Article::getPublishedDate)
-                .orElse(Instant.MIN);
+        /* 키워드 1개당 최신 기사 한개씩 가져오는걸로 변경*/
+        Map<String, Instant> latestPublishedDateByKeyword = new HashMap<>();
+        for (String keyword : keywords) {
+            Instant latestPublishedDate =
+                    articleRepository.findLatestNaverPublishedDate(keyword).orElse(Instant.MIN);
+            latestPublishedDateByKeyword.put(keyword, latestPublishedDate);
+        }
         try {
             for (String keyword : keywords) {
                 List<RawArticle> naverRawArticles;
                 try {
-                    naverRawArticles = naverNewsClient.fetch(List.of(keyword), latestNaverPublishedAt);
+                    naverRawArticles =
+                            naverNewsClient.fetch(List.of(keyword), latestPublishedDateByKeyword.get(keyword));
                 } catch (RuntimeException e) {
                     log.error("네이버 기사 수집 실패 - error: {}", e.getClass().getSimpleName());
-                    break;
+                    continue;
                 }
                 naverArticleCount += naverRawArticles.size();
 
