@@ -36,10 +36,13 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
 
     List<Article> findAllBySourceUrlIn(List<String> sourceUrls);
 
-    @Query(
-            value = "select * from articles where source = 'NAVER' order by published_date desc limit 1",
-            nativeQuery = true)
-    Optional<Article> findLatestNaverArticle();
+    @Query("""
+            select max(a.publishedDate) from Article a
+            where a.source = com.sprint.monew.article.domain.ArticleSource.NAVER
+              and (locate(lower(:keyword), lower(a.title)) > 0
+                   or locate(lower(:keyword), lower(coalesce(a.summary, ''))) > 0)
+            """)
+    Optional<Instant> findLatestNaverPublishedDate(@Param("keyword") String keyword);
 
     @Query("select a.sourceUrl from Article a where a.sourceUrl in :sourceUrls")
     List<String> findSourceUrlsIn(@Param("sourceUrls") List<String> sourceUrls);

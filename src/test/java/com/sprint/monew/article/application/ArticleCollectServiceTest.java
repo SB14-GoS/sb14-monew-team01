@@ -116,25 +116,28 @@ class ArticleCollectServiceTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    void collectsNaverPerKeywordAndSavesAllSources(boolean hasSavedNaverArticles) {
+    void usesLatestPublishedDatePerKeywordAndSavesAllSources(boolean hasSavedEconomyArticles) {
         List<RawArticle> naverArticles = articles(ArticleSource.NAVER, 2);
-        RawArticle latestArticle = naverArticles.get(0);
-        given(articleRepository.findLatestNaverArticle())
-                .willReturn(hasSavedNaverArticles ? Optional.of(existingArticle(latestArticle)) : Optional.empty());
-        Instant latestNaverPublishedAt = hasSavedNaverArticles ? latestArticle.publishDate() : Instant.MIN;
+        Instant latestPublishedDate = naverArticles.get(0).publishDate();
+        Instant economyPublishedSince = hasSavedEconomyArticles ? latestPublishedDate : Instant.MIN;
+        Instant articlePublishedSince = latestPublishedDate.minusSeconds(60);
+        given(articleRepository.findLatestNaverPublishedDate("경제"))
+                .willReturn(hasSavedEconomyArticles ? Optional.of(latestPublishedDate) : Optional.empty());
+        given(articleRepository.findLatestNaverPublishedDate("기사")).willReturn(Optional.of(articlePublishedSince));
         Set<String> keywords = Set.of("경제", "기사");
         given(interestQueryApi.getAllKeywords())
                 .willReturn(List.of(new InterestKeywordInfo(interestId, "경제", List.of("경제", "기사"))));
-        given(naverNewsClient.fetch(List.of("경제"), latestNaverPublishedAt)).willReturn(List.of(naverArticles.get(0)));
-        given(naverNewsClient.fetch(List.of("기사"), latestNaverPublishedAt)).willReturn(List.of(naverArticles.get(1)));
+        given(naverNewsClient.fetch(List.of("경제"), economyPublishedSince)).willReturn(List.of(naverArticles.get(0)));
+        given(naverNewsClient.fetch(List.of("기사"), articlePublishedSince)).willReturn(List.of(naverArticles.get(1)));
         given(chosunNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.CHOSUN, 1));
         given(yeonhapNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.YEONHAP, 3));
         given(hankyungNewsClient.fetch(keywords)).willReturn(articles(ArticleSource.HANKYUNG, 2));
         service().save();
 
-        verify(articleRepository).findLatestNaverArticle();
-        verify(naverNewsClient).fetch(List.of("경제"), latestNaverPublishedAt);
-        verify(naverNewsClient).fetch(List.of("기사"), latestNaverPublishedAt);
+        verify(articleRepository).findLatestNaverPublishedDate("경제");
+        verify(articleRepository).findLatestNaverPublishedDate("기사");
+        verify(naverNewsClient).fetch(List.of("경제"), economyPublishedSince);
+        verify(naverNewsClient).fetch(List.of("기사"), articlePublishedSince);
         verify(chosunNewsClient).fetch(keywords);
         verify(yeonhapNewsClient).fetch(keywords);
         verify(hankyungNewsClient).fetch(keywords);
