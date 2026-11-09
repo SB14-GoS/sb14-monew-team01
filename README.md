@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/SB14-GoS/sb14-monew-team01/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/SB14-GoS/sb14-monew-team01/actions/workflows/ci.yml?query=branch%3Adev) [![JaCoCo 테스트 커버리지 87.54%](https://img.shields.io/badge/JaCoCo%20coverage-87.54%25-brightgreen?style=flat-square)](https://github.com/SB14-GoS/sb14-monew-team01/pull/195#issuecomment-6723138502)
 
-<a href="https://monew.project-archive.site/"><img width="300" alt="MONEW 로고" src="docs/images/logo.png" /></a>
+<a href="https://monew.project-archive.site/"><img width="300" alt="MONEW 로고" src="docs/images/logo.svg" /></a>
 
 **관심 있는 주제의 뉴스를 한곳에서**
 
