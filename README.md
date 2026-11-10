@@ -500,6 +500,4 @@ com/sprint/monew/
 
 [서비스 바로가기](https://monew.project-archive.site/) · [맨 위로 ⬆️](#top)
 
-<sub>README 구성 참고: <a href="https://github.com/SB14-HJ3S/sb14-monew-team03">MoNew 3팀</a></sub>
-
 </div>
