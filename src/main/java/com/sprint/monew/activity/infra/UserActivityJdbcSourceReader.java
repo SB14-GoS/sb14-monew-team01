@@ -31,6 +31,8 @@ import org.springframework.stereotype.Repository;
  * <p>여러 모듈의 테이블을 직접 읽는다. 다른 모듈의 API를 사용자마다 부르면 N+1이 되고 각 모듈에 보정 전용 API가 생기므로,
  * 읽기 전용 보정 쿼리에 한해 테이블 결합을 허용한다. 필터는 Projector의 반영 규칙과 같게 맞춘다
  * (논리 삭제된 댓글과 그 좋아요는 제외, 본 기사는 기사 물리 삭제 때만 빠짐).
+ *
+ * <p>최근 10개 정렬은 MongoDB와 같게 맞춘다. MongoDB는 시각을 밀리초까지만 저장하므로 밀리초로 자른 created_at 내림차순, 같으면 id 내림차순.
  */
 @Repository
 @RequiredArgsConstructor
@@ -49,7 +51,7 @@ public class UserActivityJdbcSourceReader implements UserActivitySourceReader {
             from subscriptions s
             join interests i on i.id = s.interest_id
             where s.user_id in (:ids)
-            order by s.created_at desc, s.id desc
+            order by date_trunc('milliseconds', s.created_at) desc, s.id desc
             """;
 
     private static final String KEYWORDS_SQL =
@@ -58,7 +60,7 @@ public class UserActivityJdbcSourceReader implements UserActivitySourceReader {
     private static final String COMMENTS_SQL = """
             select * from (
                 select c.id, c.article_id, a.title, c.user_id, u.nickname, c.content, c.like_count, c.created_at,
-                       row_number() over (partition by c.user_id order by c.created_at desc, c.id desc) as rn
+                       row_number() over (partition by c.user_id order by date_trunc('milliseconds', c.created_at) desc, c.id desc) as rn
                 from comments c
                 join articles a on a.id = c.article_id
                 join users u on u.id = c.user_id
@@ -73,7 +75,7 @@ public class UserActivityJdbcSourceReader implements UserActivitySourceReader {
                 select cl.id, cl.created_at, cl.user_id as liker_id, c.id as comment_id, c.article_id, a.title,
                        c.user_id as comment_user_id, u.nickname, c.content, c.like_count,
                        c.created_at as comment_created_at,
-                       row_number() over (partition by cl.user_id order by cl.created_at desc, cl.id desc) as rn
+                       row_number() over (partition by cl.user_id order by date_trunc('milliseconds', cl.created_at) desc, cl.id desc) as rn
                 from comment_likes cl
                 join comments c on c.id = cl.comment_id
                 join users u on u.id = c.user_id
@@ -88,7 +90,7 @@ public class UserActivityJdbcSourceReader implements UserActivitySourceReader {
             select * from (
                 select v.id, v.user_id, v.created_at, a.id as article_id, a.source, a.source_url, a.title,
                        a.published_date, a.summary, a.comment_count, a.view_count,
-                       row_number() over (partition by v.user_id order by v.created_at desc, v.id desc) as rn
+                       row_number() over (partition by v.user_id order by date_trunc('milliseconds', v.created_at) desc, v.id desc) as rn
                 from article_views v
                 join articles a on a.id = v.article_id
                 where v.user_id in (:ids)

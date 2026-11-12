@@ -25,7 +25,6 @@ import org.springframework.stereotype.Repository;
 public class UserActivityMongoWriter implements UserActivityWriter {
 
     private static final int RECENT_LIMIT = 10;
-    private static final Sort LATEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
     static final String LIKE_COUNT_VERSION = "likeCountVersion";
     private final MongoTemplate mongoTemplate;
 
@@ -70,12 +69,12 @@ public class UserActivityMongoWriter implements UserActivityWriter {
 
     @Override
     public void addArticleView(UUID userId, ArticleViewItem item) {
-        pushRecent(userId, "articleViews", "articleViewId", item.articleViewId(), item);
+        pushRecent(userId, "articleViews", "articleViewId", item.articleViewId(), "articleViewId", item);
     }
 
     @Override
     public void addComment(UUID userId, CommentItem item) {
-        pushRecent(userId, "comments", "commentId", item.commentId(), item);
+        pushRecent(userId, "comments", "commentId", item.commentId(), "commentId", item);
     }
 
     @Override
@@ -95,7 +94,10 @@ public class UserActivityMongoWriter implements UserActivityWriter {
     @Override
     public void addSubscription(UUID userId, SubscriptionItem item) {
         Query query = notContaining(userId, "subscriptions", "interestId", item.interestId());
-        Update update = new Update().push("subscriptions").sort(LATEST_FIRST).each(item);
+        Update update = new Update()
+                .push("subscriptions")
+                .sort(latestFirst("subscriptionId"))
+                .each(item);
         mongoTemplate.updateFirst(query, update, UserActivityDocument.class);
     }
 
@@ -114,7 +116,8 @@ public class UserActivityMongoWriter implements UserActivityWriter {
 
     @Override
     public void addCommentLike(UUID likerId, CommentLikeItem item) {
-        pushRecent(likerId, "commentLikes", "commentLikeId", item.commentLikeId(), item);
+        // 사용자당 댓글 하나에 좋아요 하나: 이전 좋아요가 남아 있으면(취소 이벤트 유실) 같은 댓글을 두 번 넣지 않는다
+        pushRecent(likerId, "commentLikes", "commentId", item.commentId(), "commentLikeId", item);
     }
 
     @Override
@@ -174,15 +177,24 @@ public class UserActivityMongoWriter implements UserActivityWriter {
      * 최근 목록에 항목을 넣는다. 같은 이벤트가 다시 반영돼도 결과가 같다.
      *
      * <ul>
-     *   <li>이미 같은 id 항목이 있으면 넣지 않는다 (필터의 $ne)
-     *   <li>도착 순서가 아니라 createdAt 최신순으로 정렬한 뒤 10개만 남긴다. 늦게 다시 온 오래된 항목은 정렬 후 잘려 나간다
+     *   <li>이미 같은 키(guardField) 항목이 있으면 넣지 않는다 (필터의 $ne)
+     *   <li>도착 순서가 아니라 createdAt 최신순, 같으면 항목 id 내림차순으로 정렬한 뒤 10개만 남긴다. 늦게 다시 온 오래된 항목은 잘려 나간다
+     *   <li>정렬 기준은 정합성 보정의 원본 조회(밀리초 단위 created_at desc, id desc)와 같다
      * </ul>
      */
-    private void pushRecent(UUID userId, String field, String idField, UUID id, Object item) {
-        Query query = notContaining(userId, field, idField, id);
-        Update update =
-                new Update().push(field).sort(LATEST_FIRST).slice(RECENT_LIMIT).each(item);
+    private void pushRecent(
+            UUID userId, String field, String guardField, UUID guardValue, String idField, Object item) {
+        Query query = notContaining(userId, field, guardField, guardValue);
+        Update update = new Update()
+                .push(field)
+                .sort(latestFirst(idField))
+                .slice(RECENT_LIMIT)
+                .each(item);
         mongoTemplate.updateFirst(query, update, UserActivityDocument.class);
+    }
+
+    private static Sort latestFirst(String idField) {
+        return Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc(idField));
     }
 
     private Query notContaining(UUID userId, String field, String idField, UUID id) {
