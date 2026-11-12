@@ -55,7 +55,7 @@ public class ActivityOutboxRelay {
                 return new RelayResult(done, dead, false, true);
             }
             try {
-                projector.project(codec.deserialize(outbox.getEventType(), outbox.getPayload()));
+                projector.project(codec.deserialize(outbox.getEventType(), outbox.getPayload()), outbox.getId());
                 outbox.markDone(now);
                 done++;
             } catch (RuntimeException exception) {
