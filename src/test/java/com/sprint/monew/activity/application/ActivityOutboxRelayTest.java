@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.Limit;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ActivityOutboxRelayTest {
@@ -75,6 +76,7 @@ class ActivityOutboxRelayTest {
 
         assertThat(result.done()).isEqualTo(3);
         assertThat(result.hasMore()).isTrue();
+        verify(projector).project("A", batch.get(0).getId()); // outbox id를 이벤트 순번으로 넘긴다
         assertThat(batch).allSatisfy(outbox -> {
             assertThat(outbox.getStatus()).isEqualTo(ActivityOutboxStatus.DONE);
             assertThat(outbox.getProcessedAt()).isEqualTo(NOW);
@@ -89,7 +91,7 @@ class ActivityOutboxRelayTest {
         givenBatch(List.of(first, second));
         willThrow(new DataAccessResourceFailureException("mongo down"))
                 .given(projector)
-                .project("A");
+                .project(eq("A"), anyLong());
 
         ActivityOutboxRelay.RelayResult result = relay.relayBatch();
 
@@ -99,7 +101,7 @@ class ActivityOutboxRelayTest {
         assertThat(first.getNextAttemptAt()).isEqualTo(NOW.plusSeconds(1));
         assertThat(first.getLastError()).contains("mongo down");
         assertThat(second.getStatus()).isEqualTo(ActivityOutboxStatus.PENDING);
-        verify(projector, never()).project("B");
+        verify(projector, never()).project(eq("B"), anyLong());
     }
 
     @Test
@@ -112,7 +114,7 @@ class ActivityOutboxRelayTest {
         givenBatch(List.of(outbox));
         willThrow(new DataAccessResourceFailureException("mongo down"))
                 .given(projector)
-                .project("A");
+                .project(eq("A"), anyLong());
 
         relay.relayBatch();
 
@@ -128,7 +130,7 @@ class ActivityOutboxRelayTest {
         poison.markRetry("bad", NOW); // 이번이 3번째 시도
         ActivityOutbox next = outbox("B");
         givenBatch(List.of(poison, next));
-        willThrow(new IllegalArgumentException("bad payload")).given(projector).project("A");
+        willThrow(new IllegalArgumentException("bad payload")).given(projector).project(eq("A"), anyLong());
 
         ActivityOutboxRelay.RelayResult result = relay.relayBatch();
 
@@ -144,13 +146,13 @@ class ActivityOutboxRelayTest {
     void retriesPoisonEventBeforeLimit() {
         ActivityOutbox poison = outbox("A");
         givenBatch(List.of(poison, outbox("B")));
-        willThrow(new IllegalArgumentException("bad payload")).given(projector).project("A");
+        willThrow(new IllegalArgumentException("bad payload")).given(projector).project(eq("A"), anyLong());
 
         relay.relayBatch();
 
         assertThat(poison.getStatus()).isEqualTo(ActivityOutboxStatus.PENDING);
         assertThat(poison.getAttempts()).isEqualTo(1);
-        verify(projector, never()).project("B");
+        verify(projector, never()).project(eq("B"), anyLong());
     }
 
     @Test
@@ -188,7 +190,11 @@ class ActivityOutboxRelayTest {
         }
     }
 
-    private static ActivityOutbox outbox(String payload) {
-        return ActivityOutbox.pending("Type" + payload, payload, NOW);
+    private long nextId = 1;
+
+    private ActivityOutbox outbox(String payload) {
+        ActivityOutbox outbox = ActivityOutbox.pending("Type" + payload, payload, NOW);
+        ReflectionTestUtils.setField(outbox, "id", nextId++);
+        return outbox;
     }
 }

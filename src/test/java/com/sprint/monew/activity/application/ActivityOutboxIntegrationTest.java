@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
@@ -46,6 +47,9 @@ class ActivityOutboxIntegrationTest {
 
     @Autowired
     MongoTemplate mongoTemplate;
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     private final UUID userId = UUID.randomUUID();
 
@@ -121,6 +125,26 @@ class ActivityOutboxIntegrationTest {
                 .singleElement()
                 .extracting(UserActivityDocument.CommentItem::content)
                 .isEqualTo("고친 내용");
+    }
+
+    @Test
+    @DisplayName("DONE 저장 전에 멈춰 같은 이벤트가 다시 반영돼도 결과가 같다")
+    void replayIsIdempotent() {
+        transactionTemplate.executeWithoutResult(status -> {
+            publisher.publishEvent(articleViewedEvent());
+            publisher.publishEvent(new CommentCreatedEvent(
+                    UUID.randomUUID(), UUID.randomUUID(), "기사", userId, "닉네임", "내용", 0L, Instant.now()));
+        });
+        relay.relayBatch();
+
+        // relay가 MongoDB에 반영한 뒤 DONE을 커밋하지 못하고 죽은 상황
+        jdbcTemplate.update("update activity_outbox set status = 'PENDING', processed_at = null");
+        ActivityOutboxRelay.RelayResult replay = relay.relayBatch();
+
+        assertThat(replay.done()).isEqualTo(2);
+        UserActivityDocument document = repository.findById(userId).orElseThrow();
+        assertThat(document.getArticleViews()).hasSize(1);
+        assertThat(document.getComments()).hasSize(1);
     }
 
     private ArticleViewedEvent articleViewedEvent() {
