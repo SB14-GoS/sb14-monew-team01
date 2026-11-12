@@ -6,6 +6,7 @@ import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCollection;
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityWriter;
+import com.sprint.monew.activity.infra.UserActivityIndexInitializer;
 import com.sprint.monew.comment.application.CommentService;
 import com.sprint.monew.support.IntegrationTest;
 import java.sql.Timestamp;
@@ -71,6 +72,9 @@ class UserActivityCleanupBaselineTest {
     UserActivityWriter writer;
 
     @Autowired
+    UserActivityIndexInitializer indexInitializer;
+
+    @Autowired
     CommentService commentService;
 
     @Autowired
@@ -104,13 +108,14 @@ class UserActivityCleanupBaselineTest {
     @DisplayName("전체 정리 쿼리 실행 계획·지연 시간과 댓글 삭제 API 지연 시간")
     void measure(int users) {
         mongoTemplate.dropCollection(UserActivityDocument.class);
+        indexInitializer.ensureIndexes(); // 운영 기동 시와 같게 인덱스가 있는 상태에서 데이터를 쌓는다
         long seedStart = System.nanoTime();
         Seed seed = seedMongo(users);
         long seedMs = (System.nanoTime() - seedStart) / 1_000_000;
         assertThat(mongoTemplate.getCollection(COLLECTION).countDocuments()).isEqualTo(users);
 
         StringBuilder report = new StringBuilder();
-        report.append("\n## user_activities 정리 쿼리 기준 측정 - 사용자 %,d명 (%s)\n".formatted(users, Instant.now()));
+        report.append("\n## user_activities 정리 쿼리 측정 - 사용자 %,d명 (%s)\n".formatted(users, Instant.now()));
         report.append("- 문서당 구독 %d, 댓글 %d, 좋아요 %d, 본 기사 %d / 시드 %,dms / 인덱스: %s\n"
                 .formatted(
                         SUBSCRIPTIONS_PER_USER,
