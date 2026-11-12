@@ -11,6 +11,13 @@ public interface UserActivityWriter {
 
     void create(UUID userId, String email, String nickname, Instant createdAt);
 
+    /**
+     * 원본으로 다시 만든 문서를 한 번에 넣는다. 이미 문서가 있으면 건드리지 않는다.
+     *
+     * @return 새로 넣었으면 true, 이미 있었으면 false
+     */
+    boolean restore(UserActivitySource source);
+
     void updateNickname(UUID userId, String nickname);
 
     void delete(UUID userId);
@@ -39,6 +46,8 @@ public interface UserActivityWriter {
     void updateCommentLikeCount(UUID commentUserId, UUID commentId, long likeCount, long version);
 
     void removeCommentLikeFromAll(UUID commentId);
+
+    void removeArticleView(UUID userId, UUID articleViewId);
 
     void removeArticleViewFromAll(UUID articleId);
 
