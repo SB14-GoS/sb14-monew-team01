@@ -170,7 +170,7 @@ class UserActivityProjectorTest {
         UUID likerId = UUID.randomUUID();
         UUID commentLikeId = UUID.randomUUID();
 
-        projector.onCommentLiked(commentLikedEvent(commentLikeId, likerId));
+        projector.onCommentLiked(commentLikedEvent(commentLikeId, likerId), 7L);
 
         ArgumentCaptor<CommentLikeItem> captor = ArgumentCaptor.forClass(CommentLikeItem.class);
         verify(writer).addCommentLike(eq(likerId), captor.capture());
@@ -186,7 +186,7 @@ class UserActivityProjectorTest {
                         "댓글 내용",
                         4L,
                         thirdTime));
-        verify(writer).updateCommentLikeCount(commentUserId, commentId, 4L);
+        verify(writer).updateCommentLikeCount(commentUserId, commentId, 4L, 7L);
     }
 
     @Test
@@ -194,10 +194,10 @@ class UserActivityProjectorTest {
     void onCommentUnliked() {
         UUID likerId = UUID.randomUUID();
 
-        projector.onCommentUnliked(new CommentUnlikedEvent(commentId, likerId, commentUserId, 2L));
+        projector.onCommentUnliked(new CommentUnlikedEvent(commentId, likerId, commentUserId, 2L), 8L);
 
         verify(writer).removeCommentLike(likerId, commentId);
-        verify(writer).updateCommentLikeCount(commentUserId, commentId, 2L);
+        verify(writer).updateCommentLikeCount(commentUserId, commentId, 2L, 8L);
     }
 
     @Test
@@ -207,7 +207,7 @@ class UserActivityProjectorTest {
         ArticleViewedEvent event = new ArticleViewedEvent(
                 UUID.randomUUID(), userId, firstTime, articleId, "NAVER", "url", "제목", secondTime, "요약", 0L, 1L);
 
-        assertThatThrownBy(() -> projector.project(event)).hasMessage("mongo down");
+        assertThatThrownBy(() -> projector.project(event, 1L)).hasMessage("mongo down");
     }
 
     @Test
@@ -246,7 +246,7 @@ class UserActivityProjectorTest {
 
         assertThat(events).hasSize(ActivityEventCodec.EVENT_TYPES.size());
         for (Object event : events) {
-            assertThatThrownBy(() -> failing.project(event))
+            assertThatThrownBy(() -> failing.project(event, 1L))
                     .as(event.getClass().getSimpleName())
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("writer called");
@@ -256,7 +256,7 @@ class UserActivityProjectorTest {
     @Test
     @DisplayName("다루지 않는 이벤트는 IllegalArgumentException")
     void rejectsUnknownEvent() {
-        assertThatThrownBy(() -> projector.project("unknown")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> projector.project("unknown", 1L)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private CommentLikedEvent commentLikedEvent(UUID commentLikeId, UUID likerId) {

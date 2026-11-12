@@ -1,7 +1,6 @@
 package com.sprint.monew.activity.infra;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityDocument.ArticleViewItem;
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 @IntegrationTest
@@ -35,6 +33,14 @@ class UserActivityMongoWriterTest {
     MongoTemplate mongoTemplate;
 
     private final UUID userId = UUID.randomUUID();
+
+    /** 항목마다 1초씩 늦은 시각. 최신순 정렬이 Instant.now()의 밀리초 충돌에 흔들리지 않게 한다. */
+    private Instant clock = Instant.parse("2026-10-26T00:00:00Z");
+
+    private Instant nextTime() {
+        clock = clock.plusSeconds(1);
+        return clock;
+    }
 
     @AfterEach
     void tearDown() {
@@ -59,14 +65,19 @@ class UserActivityMongoWriterTest {
     }
 
     @Test
-    @DisplayName("같은 사용자로 다시 만들면 기존 문서를 덮어쓰지 않고 예외가 난다")
+    @DisplayName("같은 사용자로 다시 만들어도 예외 없이 기존 문서를 그대로 둔다")
     void createDuplicate() {
         createUser(userId);
         writer.addComment(userId, comment(UUID.randomUUID(), userId));
 
-        assertThatThrownBy(() -> writer.create(userId, "other@monew.com", "다른닉네임", Instant.now()))
-                .isInstanceOf(DuplicateKeyException.class);
-        assertThat(find(userId).getComments()).hasSize(1);
+        writer.create(userId, "other@monew.com", "다른닉네임", Instant.now());
+
+        UserActivityDocument document = find(userId);
+        assertThat(document.getEmail()).isEqualTo("user@monew.com");
+        assertThat(document.getNickname()).isEqualTo("닉네임");
+        assertThat(document.getComments()).hasSize(1);
+        assertThat(mongoTemplate.getCollection("user_activities").countDocuments())
+                .isEqualTo(1);
     }
 
     @Test
@@ -313,10 +324,87 @@ class UserActivityMongoWriterTest {
         writer.addComment(userId, comment(target, userId));
         writer.addComment(userId, comment(other, userId));
 
-        writer.updateCommentLikeCount(userId, target, 5L);
+        writer.updateCommentLikeCount(userId, target, 5L, 1L);
 
         assertThat(commentById(userId, target).likeCount()).isEqualTo(5L);
         assertThat(commentById(userId, other).likeCount()).isZero();
+    }
+
+    // ========================================================================================
+    // 같은 이벤트가 다시 반영되거나 순서가 뒤바뀌어도 결과가 같다 (#198)
+
+    @Test
+    @DisplayName("같은 항목을 두 번 넣어도 한 번만 남는다")
+    void addTwiceKeepsOne() {
+        createUser(userId);
+        CommentItem comment = comment(UUID.randomUUID(), userId);
+        ArticleViewItem view = articleView(UUID.randomUUID());
+        CommentLikeItem like = commentLike(UUID.randomUUID(), UUID.randomUUID());
+        SubscriptionItem subscription = subscription(UUID.randomUUID());
+
+        for (int i = 0; i < 2; i++) {
+            writer.addComment(userId, comment);
+            writer.addArticleView(userId, view);
+            writer.addCommentLike(userId, like);
+            writer.addSubscription(userId, subscription);
+        }
+
+        UserActivityDocument document = find(userId);
+        assertThat(document.getComments()).hasSize(1);
+        assertThat(document.getArticleViews()).hasSize(1);
+        assertThat(document.getCommentLikes()).hasSize(1);
+        assertThat(document.getSubscriptions()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("늦게 도착한 항목도 createdAt 최신순 자리에 들어간다")
+    void addOutOfOrderSortsByCreatedAt() {
+        createUser(userId);
+        CommentItem older = comment(UUID.randomUUID(), userId);
+        CommentItem newer = comment(UUID.randomUUID(), userId);
+
+        writer.addComment(userId, newer);
+        writer.addComment(userId, older);
+
+        assertThat(find(userId).getComments())
+                .extracting(CommentItem::commentId)
+                .containsExactly(newer.commentId(), older.commentId());
+    }
+
+    @Test
+    @DisplayName("최신 10개에서 밀려난 항목이 다시 와도 되살아나지 않는다")
+    void staleItemDoesNotComeBack() {
+        createUser(userId);
+        CommentItem stale = comment(UUID.randomUUID(), userId);
+        writer.addComment(userId, stale);
+        for (int i = 0; i < 10; i++) {
+            writer.addComment(userId, comment(UUID.randomUUID(), userId));
+        }
+
+        writer.addComment(userId, stale);
+
+        assertThat(find(userId).getComments())
+                .hasSize(10)
+                .extracting(CommentItem::commentId)
+                .doesNotContain(stale.commentId());
+    }
+
+    @Test
+    @DisplayName("좋아요 수는 저장된 버전보다 새 이벤트일 때만 바뀐다")
+    void likeCountIgnoresOlderVersion() {
+        createUser(userId);
+        UUID target = UUID.randomUUID();
+        writer.addComment(userId, comment(target, userId));
+
+        writer.updateCommentLikeCount(userId, target, 6L, 11L);
+        writer.updateCommentLikeCount(userId, target, 5L, 10L); // 늦게 도착한 이전 이벤트
+        writer.updateCommentLikeCount(userId, target, 9L, 11L); // 같은 버전 재반영
+
+        assertThat(commentById(userId, target).likeCount()).isEqualTo(6L);
+
+        writer.updateCommentLikeCount(userId, target, 7L, 12L);
+
+        assertThat(commentById(userId, target).likeCount()).isEqualTo(7L);
     }
 
     private void createUser(UUID id) {
@@ -335,13 +423,13 @@ class UserActivityMongoWriterTest {
     }
 
     private CommentItem comment(UUID commentId, UUID authorId) {
-        return new CommentItem(commentId, UUID.randomUUID(), "기사 제목", authorId, "닉네임", "댓글 내용", 0L, Instant.now());
+        return new CommentItem(commentId, UUID.randomUUID(), "기사 제목", authorId, "닉네임", "댓글 내용", 0L, nextTime());
     }
 
     private CommentLikeItem commentLike(UUID commentLikeId, UUID commentId) {
         return new CommentLikeItem(
                 commentLikeId,
-                Instant.now(),
+                nextTime(),
                 commentId,
                 UUID.randomUUID(),
                 "기사 제목",
@@ -349,23 +437,23 @@ class UserActivityMongoWriterTest {
                 "작성자",
                 "댓글 내용",
                 1L,
-                Instant.now());
+                nextTime());
     }
 
     private SubscriptionItem subscription(UUID interestId) {
-        return new SubscriptionItem(UUID.randomUUID(), interestId, "관심사", List.of("키워드"), 1L, Instant.now());
+        return new SubscriptionItem(UUID.randomUUID(), interestId, "관심사", List.of("키워드"), 1L, nextTime());
     }
 
     private ArticleViewItem articleView(UUID articleViewId) {
         return new ArticleViewItem(
                 articleViewId,
                 userId,
-                Instant.now(),
+                nextTime(),
                 UUID.randomUUID(),
                 "NAVER",
                 "https://news.example.com/1",
                 "기사 제목",
-                Instant.now(),
+                nextTime(),
                 "요약",
                 0L,
                 1L);
