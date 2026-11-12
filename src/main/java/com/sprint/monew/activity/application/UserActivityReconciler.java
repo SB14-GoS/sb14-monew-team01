@@ -9,6 +9,7 @@ import com.sprint.monew.activity.domain.UserActivityRepository;
 import com.sprint.monew.activity.domain.UserActivitySource;
 import com.sprint.monew.activity.domain.UserActivitySourceReader;
 import com.sprint.monew.activity.domain.UserActivityWriter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -129,6 +130,7 @@ public class UserActivityReconciler {
                 userId,
                 source.subscriptions(),
                 document == null ? List.of() : document.getSubscriptions(),
+                SubscriptionItem::subscriptionId,
                 SubscriptionItem::interestId,
                 writer::addSubscription,
                 writer::removeSubscription);
@@ -138,14 +140,15 @@ public class UserActivityReconciler {
                 source.comments(),
                 document == null ? List.of() : document.getComments(),
                 CommentItem::commentId,
+                CommentItem::commentId,
                 writer::addComment,
                 writer::removeComment);
-        // 좋아요는 Writer가 commentId로 지우므로 commentId로 비교한다 (사용자당 댓글 하나에 좋아요 하나)
         diff(
                 changes,
                 userId,
                 source.commentLikes(),
                 document == null ? List.of() : document.getCommentLikes(),
+                CommentLikeItem::commentLikeId,
                 CommentLikeItem::commentId,
                 writer::addCommentLike,
                 writer::removeCommentLike);
@@ -155,31 +158,42 @@ public class UserActivityReconciler {
                 source.articleViews(),
                 document == null ? List.of() : document.getArticleViews(),
                 ArticleViewItem::articleViewId,
+                ArticleViewItem::articleViewId,
                 writer::addArticleView,
                 writer::removeArticleView);
 
         return new ReconcileResult(1, changes.any() ? 1 : 0, 0, changes.added, changes.removed, 0);
     }
 
-    /** 남는 항목을 먼저 지우고 빠진 항목을 넣는다 (넣다가 최근 10개 제한에 정상 항목이 밀려나지 않게). */
+    /**
+     * 항목 id(identity)로 비교해 남는 항목을 먼저 지우고 빠진 항목을 넣는다 (넣다가 최근 10개 제한에 정상 항목이 밀려나지 않게).
+     *
+     * <p>Writer는 구독을 interestId로, 좋아요를 commentId로 지우므로(removalKey) 같은 관심사·댓글에 이전 항목이 남은 경우도 잡는다. 예: 구독 취소
+     * 이벤트가 유실된 뒤 재구독하면 interestId는 같고 subscriptionId만 다르다. 지울 때 같은 키의 정상 항목도 함께 빠지므로 다시 넣는다.
+     */
     private static <T> void diff(
             Changes changes,
             UUID userId,
             List<T> expected,
             List<T> actual,
-            Function<T, UUID> idOf,
+            Function<T, UUID> identity,
+            Function<T, UUID> removalKey,
             BiConsumer<UUID, T> add,
             BiConsumer<UUID, UUID> remove) {
-        Set<UUID> expectedIds = expected.stream().map(idOf).collect(Collectors.toSet());
-        Set<UUID> actualIds = actual.stream().map(idOf).collect(Collectors.toSet());
-        for (UUID id : actualIds) {
-            if (!expectedIds.contains(id)) {
-                remove.accept(userId, id);
+        Set<UUID> expectedIds = expected.stream().map(identity).collect(Collectors.toSet());
+        Set<UUID> actualIds = actual.stream().map(identity).collect(Collectors.toSet());
+        Set<UUID> removedKeys = new HashSet<>();
+        for (T item : actual) {
+            if (!expectedIds.contains(identity.apply(item))) {
+                UUID key = removalKey.apply(item);
+                if (removedKeys.add(key)) {
+                    remove.accept(userId, key);
+                }
                 changes.removed++;
             }
         }
         for (T item : expected) {
-            if (!actualIds.contains(idOf.apply(item))) {
+            if (!actualIds.contains(identity.apply(item)) || removedKeys.contains(removalKey.apply(item))) {
                 add.accept(userId, item);
                 changes.added++;
             }
