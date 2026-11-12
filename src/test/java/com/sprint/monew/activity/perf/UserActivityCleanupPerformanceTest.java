@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCollection;
+import com.sprint.monew.activity.application.ActivityOutboxRelay;
+import com.sprint.monew.activity.domain.ActivityOutboxRepository;
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import com.sprint.monew.activity.infra.UserActivityIndexInitializer;
@@ -33,18 +35,18 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * #198 기준 측정: user_activities 전체 정리 쿼리(updateMulti)와 그 쿼리를 요청 스레드에서 실행하는 댓글 삭제 API의 지연 시간.
+ * #198: user_activities 전체 정리 쿼리(updateMulti) 지연 시간, 댓글 삭제 API 지연 시간, 그 삭제 이벤트를 relay가 MongoDB에 반영하는 시간.
  *
  * <p>무거운 테스트라 {@code PERF=true}일 때만 실행한다. 사용자 수는 {@code PERF_USERS}(쉼표 구분, 기본 10000,100000)로 바꾼다.
  *
- * <pre>{@code PERF=true ./gradlew test --tests '*UserActivityCleanupBaselineTest'}</pre>
+ * <pre>{@code PERF=true ./gradlew test --tests '*UserActivityCleanupPerformanceTest'}</pre>
  *
  * 결과는 콘솔과 build/reports/performance/activity-cleanup.md 에 남는다.
  */
 @Tag("performance")
 @IntegrationTest
 @EnabledIfEnvironmentVariable(named = "PERF", matches = "true")
-class UserActivityCleanupBaselineTest {
+class UserActivityCleanupPerformanceTest {
 
     private static final String REPORT = "activity-cleanup";
     private static final String COLLECTION = "user_activities";
@@ -75,6 +77,12 @@ class UserActivityCleanupBaselineTest {
     UserActivityIndexInitializer indexInitializer;
 
     @Autowired
+    ActivityOutboxRelay relay;
+
+    @Autowired
+    ActivityOutboxRepository outboxRepository;
+
+    @Autowired
     CommentService commentService;
 
     @Autowired
@@ -91,6 +99,7 @@ class UserActivityCleanupBaselineTest {
 
     @AfterEach
     void tearDown() {
+        outboxRepository.deleteAll();
         mongoTemplate.dropCollection(UserActivityDocument.class);
         if (postgresArticleId != null) {
             jdbcTemplate.update("delete from comments where article_id = ?", postgresArticleId);
@@ -142,11 +151,21 @@ class UserActivityCleanupBaselineTest {
                 "removeCommentLikesOfUserFromAll", seed.authorTargets, writer::removeCommentLikesOfUserFromAll));
 
         seedPostgresComments(seed);
-        report.append("\n### 댓글 삭제 API 지연 시간 (CommentService.delete, AFTER_COMMIT 리스너 포함)\n");
+        outboxRepository.deleteAll();
+        report.append("\n### 댓글 삭제 API 지연 시간 (CommentService.delete, outbox 저장까지)\n");
         report.append(LatencyStats.header()).append('\n');
         LatencyStats delete =
                 LatencyStats.measure(WARM_UP, ITERATIONS, i -> commentService.delete(seed.deleteTargets.get(i), null));
         report.append(delete.toRow("CommentService.delete")).append('\n');
+
+        // 요청 스레드에서 빠진 MongoDB 작업: relay가 삭제 이벤트를 반영하는 시간
+        long pending = outboxRepository.count();
+        long relayStart = System.nanoTime();
+        ActivityOutboxRelay.RelayResult result = relay.relayBatch();
+        double relayMs = (System.nanoTime() - relayStart) / 1_000_000.0;
+        assertThat(result.done()).isEqualTo(pending);
+        report.append("\n### relay 반영 시간 (요청 스레드 밖)\n");
+        report.append("- 댓글 삭제 이벤트 %d건 / %.1fms / 건당 %.3fms\n".formatted(pending, relayMs, relayMs / pending));
 
         PerfReport.write(REPORT, report.toString());
     }
