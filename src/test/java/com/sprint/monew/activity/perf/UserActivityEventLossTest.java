@@ -151,6 +151,8 @@ class UserActivityEventLossTest {
         assertThat(outboxRepository.countByStatus(ActivityOutboxStatus.DEAD)).isZero();
         assertThat(comments.lost()).isZero();
         assertThat(views.lost()).isZero();
+        assertThat(comments.duplicates()).isZero(); // 재시도로 같은 이벤트가 여러 번 반영돼도 중복 없음
+        assertThat(views.duplicates()).isZero();
 
         PerfReport.write(REPORT, """
 
@@ -206,15 +208,18 @@ class UserActivityEventLossTest {
     private Result compare(String sourceSql, Function<UserActivityDocument, List<UUID>> projected) {
         int source = 0;
         int lost = 0;
+        int duplicates = 0;
         for (UUID userId : userIds) {
             List<UUID> sourceIds = jdbcTemplate.queryForList(sourceSql, UUID.class, userId);
-            Set<UUID> projectedIds =
-                    new HashSet<>(projected.apply(repository.findById(userId).orElseThrow()));
+            List<UUID> projectedList =
+                    projected.apply(repository.findById(userId).orElseThrow());
+            Set<UUID> projectedIds = new HashSet<>(projectedList);
             source += sourceIds.size();
             lost += (int)
                     sourceIds.stream().filter(id -> !projectedIds.contains(id)).count();
+            duplicates += projectedList.size() - projectedIds.size();
         }
-        return new Result(source, lost);
+        return new Result(source, lost, duplicates);
     }
 
     private UUID insertUser(int index) {
@@ -252,7 +257,7 @@ class UserActivityEventLossTest {
         return id;
     }
 
-    private record Result(int source, int lost) {
+    private record Result(int source, int lost, int duplicates) {
 
         String toRow(String label) {
             int projected = source - lost;
