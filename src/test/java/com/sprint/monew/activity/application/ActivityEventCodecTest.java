@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.event.TransactionalEventListener;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 class ActivityEventCodecTest {
@@ -42,6 +43,21 @@ class ActivityEventCodecTest {
         assertThatThrownBy(() -> codec.deserialize("java.lang.Runtime", "{}"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> codec.typeOf("문자열")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("깨진 JSON이나 잘못된 UUID·시각은 예외로 알린다 (relay가 데이터 문제로 처리)")
+    void rejectsBrokenPayload() {
+        assertThatThrownBy(() -> codec.deserialize("InterestUnsubscribedEvent", "{not json"))
+                .isInstanceOf(JacksonException.class);
+        assertThatThrownBy(() -> codec.deserialize(
+                        "InterestUnsubscribedEvent", "{\"userId\":\"not-a-uuid\",\"interestId\":null}"))
+                .isInstanceOf(JacksonException.class);
+        assertThatThrownBy(() -> codec.deserialize(
+                        "UserRegisteredEvent",
+                        "{\"userId\":\"%s\",\"email\":\"a@b.c\",\"nickname\":\"n\",\"createdAt\":\"어제\"}"
+                                .formatted(UUID.randomUUID())))
+                .isInstanceOf(JacksonException.class);
     }
 
     @Test

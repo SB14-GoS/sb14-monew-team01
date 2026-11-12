@@ -3,6 +3,7 @@ package com.sprint.monew.activity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
@@ -251,6 +252,18 @@ class UserActivityProjectorTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("writer called");
         }
+    }
+
+    @Test
+    @DisplayName("좋아요 이벤트에서 두 번째 쓰기(좋아요 수)가 실패해도 예외를 던져 relay가 재시도하게 한다")
+    void propagatesSecondWriteFailure() {
+        willThrow(new RuntimeException("mongo down"))
+                .given(writer)
+                .updateCommentLikeCount(any(), any(), anyLong(), anyLong());
+        CommentLikedEvent event = commentLikedEvent(UUID.randomUUID(), UUID.randomUUID());
+
+        assertThatThrownBy(() -> projector.project(event, 3L)).hasMessage("mongo down");
+        verify(writer).addCommentLike(any(), any());
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityDocument.ArticleViewItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentLikeItem;
+import com.sprint.monew.activity.domain.UserActivityDocument.SubscriptionItem;
 import com.sprint.monew.activity.domain.UserActivityRepository;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import com.sprint.monew.support.IntegrationTest;
@@ -14,8 +15,10 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -167,6 +170,63 @@ class UserActivityReconcilerTest {
     }
 
     @Test
+    @DisplayName("같은 관심사·댓글에 이전 항목이 남아 있으면 원본 항목으로 바꾼다 (취소 이벤트 유실 후 재구독·재좋아요)")
+    void replacesStaleItemWithSameKey() {
+        writer.create(me, "me@monew.com", "me-" + suffix, T0);
+        UUID staleSubscriptionId = UUID.randomUUID();
+        writer.addSubscription(me, new SubscriptionItem(staleSubscriptionId, interest, "관심사", List.of(), 1L, T0));
+        // 같은 댓글에 이전 좋아요와 원본 좋아요가 둘 다 남은 상태
+        mongoTemplate
+                .getCollection("user_activities")
+                .updateOne(
+                        new Document("_id", me),
+                        new Document(
+                                "$push",
+                                new Document(
+                                        "commentLikes",
+                                        new Document(
+                                                "$each",
+                                                List.of(likeDocument(UUID.randomUUID()), likeDocument(likeId))))));
+
+        reconciler.reconcile(List.of(me));
+
+        UserActivityDocument document = repository.findById(me).orElseThrow();
+        assertThat(document.getSubscriptions())
+                .extracting(SubscriptionItem::subscriptionId)
+                .containsExactly(subscriptionId);
+        assertThat(document.getCommentLikes())
+                .extracting(CommentLikeItem::commentLikeId)
+                .containsExactly(likeId);
+        assertThat(reconciler.reconcile(List.of(me)).repaired()).isZero();
+    }
+
+    @Test
+    @DisplayName("원본에 11개가 있고 시각이 같아도 MongoDB와 같은 최근 10개를 고른다")
+    void recentTenBoundaryWithSameCreatedAt() {
+        jdbcTemplate.update("delete from comments where user_id = ?", me);
+        Timestamp sameTime = at(30);
+        for (int i = 0; i < 11; i++) {
+            jdbcTemplate.update(
+                    "insert into comments (id, article_id, user_id, content, like_count, created_at, updated_at) values (?, ?, ?, ?, 0, ?, ?)",
+                    UUID.randomUUID(),
+                    article,
+                    me,
+                    "같은 시각 " + i,
+                    sameTime,
+                    sameTime);
+        }
+        List<UUID> expected = jdbcTemplate.queryForList(
+                "select id from comments where user_id = ? order by id desc limit 10", UUID.class, me);
+
+        reconciler.reconcile(List.of(me));
+
+        assertThat(repository.findById(me).orElseThrow().getComments())
+                .extracting(CommentItem::commentId)
+                .containsExactlyElementsOf(expected);
+        assertThat(reconciler.reconcile(List.of(me)).repaired()).isZero();
+    }
+
+    @Test
     @DisplayName("배치는 전체 사용자를 보정하고 사용자가 사라진 문서를 지운다")
     void jobReconcilesAllAndRemovesOrphans() throws Exception {
         UUID orphan = UUID.randomUUID();
@@ -300,5 +360,19 @@ class UserActivityReconcilerTest {
 
     private ArticleViewItem viewItem(UUID articleViewId) {
         return new ArticleViewItem(articleViewId, me, T0, article, "NAVER", "url", "기사", T0, "요약", 0L, 1L);
+    }
+
+    private Document likeDocument(UUID commentLikeId) {
+        Date time = Date.from(T0.plusSeconds(300));
+        return new Document("commentLikeId", commentLikeId)
+                .append("createdAt", time)
+                .append("commentId", authorComment)
+                .append("articleId", article)
+                .append("articleTitle", "기사")
+                .append("commentUserId", author)
+                .append("commentUserNickname", "작성자")
+                .append("commentContent", "댓글")
+                .append("commentLikeCount", 1L)
+                .append("commentCreatedAt", time);
     }
 }
