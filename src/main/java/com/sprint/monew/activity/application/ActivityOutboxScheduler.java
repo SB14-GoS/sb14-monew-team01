@@ -17,15 +17,20 @@ import org.springframework.stereotype.Component;
         matchIfMissing = true)
 public class ActivityOutboxScheduler {
 
+    /** 한 번 호출에 처리할 최대 배치 수. 백로그가 많아도 스케줄러 스레드를 오래 붙잡지 않고 다음 주기로 넘긴다. */
+    static final int MAX_BATCHES_PER_RUN = 10;
+
     private final ActivityOutboxRelay relay;
 
-    /** 쌓인 이벤트가 있으면 배치를 연달아 돌려 비운다. */
+    /** 쌓인 이벤트가 있으면 배치를 연달아 돌린다 (최대 {@value #MAX_BATCHES_PER_RUN}번). */
     @Scheduled(fixedDelayString = "${monew.activity.outbox.poll-delay-ms:1000}")
     public void relay() {
         RelayResult result;
+        int batches = 0;
         do {
             result = relay.relayBatch();
-        } while (result.hasMore());
+            batches++;
+        } while (result.hasMore() && batches < MAX_BATCHES_PER_RUN);
     }
 
     @Scheduled(cron = "${monew.activity.outbox.purge-cron:0 30 4 * * *}", zone = "Asia/Seoul")
