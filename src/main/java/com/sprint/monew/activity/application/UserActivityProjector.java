@@ -19,197 +19,148 @@ import com.sprint.monew.user.api.UserDeletedEvent;
 import com.sprint.monew.user.api.UserNicknameUpdatedEvent;
 import com.sprint.monew.user.api.UserRegisteredEvent;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
-@Slf4j
+/**
+ * 도메인 이벤트를 MongoDB 활동 내역 문서 변경으로 옮긴다. {@link ActivityOutboxRelay}가 outbox 순서대로 호출한다.
+ *
+ * <p>Writer 예외는 삼키지 않고 그대로 던진다. relay가 실패를 보고 재시도한다.
+ */
 @Component
 @RequiredArgsConstructor
 public class UserActivityProjector {
 
     private final UserActivityWriter userActivityWriter;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void project(Object event) {
+        if (event instanceof ArticleViewedEvent e) {
+            onArticleViewed(e);
+        } else if (event instanceof ArticleDeleteEvent e) {
+            onArticleDeleted(e);
+        } else if (event instanceof InterestSubscribedEvent e) {
+            onInterestSubscribed(e);
+        } else if (event instanceof InterestUnsubscribedEvent e) {
+            onInterestUnsubscribed(e);
+        } else if (event instanceof InterestDeletedEvent e) {
+            onInterestDeleted(e);
+        } else if (event instanceof UserRegisteredEvent e) {
+            onUserRegistered(e);
+        } else if (event instanceof UserNicknameUpdatedEvent e) {
+            onUserNicknameUpdated(e);
+        } else if (event instanceof UserDeletedEvent e) {
+            onUserDeleted(e);
+        } else if (event instanceof CommentCreatedEvent e) {
+            onCommentCreated(e);
+        } else if (event instanceof CommentUpdatedEvent e) {
+            onCommentUpdated(e);
+        } else if (event instanceof CommentDeletedEvent e) {
+            onCommentDeleted(e);
+        } else if (event instanceof CommentLikedEvent e) {
+            onCommentLiked(e);
+        } else if (event instanceof CommentUnlikedEvent e) {
+            onCommentUnliked(e);
+        } else {
+            throw new IllegalArgumentException(
+                    "활동 내역이 다루지 않는 이벤트: " + event.getClass().getName());
+        }
+    }
+
     public void onArticleViewed(ArticleViewedEvent event) {
-        try {
-            userActivityWriter.addArticleView(
-                    event.userId(),
-                    new ArticleViewItem(
-                            event.articleViewId(),
-                            event.userId(),
-                            event.viewedAt(),
-                            event.articleId(),
-                            event.source(),
-                            event.sourceUrl(),
-                            event.articleTitle(),
-                            event.articlePublishedDate(),
-                            event.articleSummary(),
-                            event.articleCommentCount(),
-                            event.articleViewCount()));
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "ArticleViewed", event.userId(), exception);
-        }
+        userActivityWriter.addArticleView(
+                event.userId(),
+                new ArticleViewItem(
+                        event.articleViewId(),
+                        event.userId(),
+                        event.viewedAt(),
+                        event.articleId(),
+                        event.source(),
+                        event.sourceUrl(),
+                        event.articleTitle(),
+                        event.articlePublishedDate(),
+                        event.articleSummary(),
+                        event.articleCommentCount(),
+                        event.articleViewCount()));
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onInterestSubscribed(InterestSubscribedEvent event) {
-        try {
-            userActivityWriter.addSubscription(
-                    event.userId(),
-                    new SubscriptionItem(
-                            event.subscriptionId(),
-                            event.interestId(),
-                            event.interestName(),
-                            event.interestKeywords(),
-                            event.interestSubscriberCount(),
-                            event.subscribedAt()));
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "InterestSubscribed", event.userId(), exception);
-        }
+        userActivityWriter.addSubscription(
+                event.userId(),
+                new SubscriptionItem(
+                        event.subscriptionId(),
+                        event.interestId(),
+                        event.interestName(),
+                        event.interestKeywords(),
+                        event.interestSubscriberCount(),
+                        event.subscribedAt()));
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onInterestUnsubscribed(InterestUnsubscribedEvent event) {
-        try {
-            userActivityWriter.removeSubscription(event.userId(), event.interestId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "InterestUnsubscribed", event.userId(), exception);
-        }
+        userActivityWriter.removeSubscription(event.userId(), event.interestId());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onInterestDeleted(InterestDeletedEvent event) {
-        try {
-            userActivityWriter.removeInterestFromAll(event.interestId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, interestId: {}", "InterestDeleted", event.interestId(), exception);
-        }
+        userActivityWriter.removeInterestFromAll(event.interestId());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRegistered(UserRegisteredEvent event) {
-        try {
-            userActivityWriter.create(event.userId(), event.email(), event.nickname(), event.createdAt());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserRegistered", event.userId(), exception);
-        }
+        userActivityWriter.create(event.userId(), event.email(), event.nickname(), event.createdAt());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserNicknameUpdated(UserNicknameUpdatedEvent event) {
-        try {
-            userActivityWriter.updateNickname(event.userId(), event.nickname());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserNicknameUpdated", event.userId(), exception);
-        }
+        userActivityWriter.updateNickname(event.userId(), event.nickname());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserDeleted(UserDeletedEvent event) {
-        try {
-            userActivityWriter.delete(event.userId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserDeleted", event.userId(), exception);
-        }
-        try {
-            userActivityWriter.removeCommentLikesOfUserFromAll(event.userId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "UserDeletedLikes", event.userId(), exception);
-        }
+        userActivityWriter.delete(event.userId());
+        userActivityWriter.removeCommentLikesOfUserFromAll(event.userId());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(CommentCreatedEvent event) {
-        try {
-            userActivityWriter.addComment(
-                    event.userId(),
-                    new CommentItem(
-                            event.commentId(),
-                            event.articleId(),
-                            event.articleTitle(),
-                            event.userId(),
-                            event.userNickname(),
-                            event.content(),
-                            event.likeCount(),
-                            event.createdAt()));
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentCreated", event.userId(), exception);
-        }
+        userActivityWriter.addComment(
+                event.userId(),
+                new CommentItem(
+                        event.commentId(),
+                        event.articleId(),
+                        event.articleTitle(),
+                        event.userId(),
+                        event.userNickname(),
+                        event.content(),
+                        event.likeCount(),
+                        event.createdAt()));
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentUpdated(CommentUpdatedEvent event) {
-        try {
-            userActivityWriter.updateCommentContent(event.userId(), event.commentId(), event.content());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentUpdated", event.userId(), exception);
-        }
+        userActivityWriter.updateCommentContent(event.userId(), event.commentId(), event.content());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentDeleted(CommentDeletedEvent event) {
-        try {
-            userActivityWriter.removeComment(event.userId(), event.commentId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentDeleted", event.userId(), exception);
-        }
-        try {
-            userActivityWriter.removeCommentLikeFromAll(event.commentId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, commentId: {}", "CommentDeletedLikes", event.commentId(), exception);
-        }
+        userActivityWriter.removeComment(event.userId(), event.commentId());
+        userActivityWriter.removeCommentLikeFromAll(event.commentId());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentLiked(CommentLikedEvent event) {
-        try {
-            userActivityWriter.addCommentLike(
-                    event.likerId(),
-                    new CommentLikeItem(
-                            event.commentLikeId(),
-                            event.likedAt(),
-                            event.commentId(),
-                            event.articleId(),
-                            event.articleTitle(),
-                            event.commentUserId(),
-                            event.commentUserNickname(),
-                            event.commentContent(),
-                            event.commentLikeCount(),
-                            event.commentCreatedAt()));
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentLiked", event.likerId(), exception);
-        }
-        try {
-            userActivityWriter.updateCommentLikeCount(
-                    event.commentUserId(), event.commentId(), event.commentLikeCount());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentLikedCount", event.commentUserId(), exception);
-        }
+        userActivityWriter.addCommentLike(
+                event.likerId(),
+                new CommentLikeItem(
+                        event.commentLikeId(),
+                        event.likedAt(),
+                        event.commentId(),
+                        event.articleId(),
+                        event.articleTitle(),
+                        event.commentUserId(),
+                        event.commentUserNickname(),
+                        event.commentContent(),
+                        event.commentLikeCount(),
+                        event.commentCreatedAt()));
+        userActivityWriter.updateCommentLikeCount(event.commentUserId(), event.commentId(), event.commentLikeCount());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentUnliked(CommentUnlikedEvent event) {
-        try {
-            userActivityWriter.removeCommentLike(event.likerId(), event.commentId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentUnliked", event.likerId(), exception);
-        }
-        try {
-            userActivityWriter.updateCommentLikeCount(
-                    event.commentUserId(), event.commentId(), event.commentLikeCount());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, userId: {}", "CommentUnlikedCount", event.commentUserId(), exception);
-        }
+        userActivityWriter.removeCommentLike(event.likerId(), event.commentId());
+        userActivityWriter.updateCommentLikeCount(event.commentUserId(), event.commentId(), event.commentLikeCount());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onArticleDeleted(ArticleDeleteEvent event) {
-        try {
-            userActivityWriter.removeArticleViewFromAll(event.articleId());
-        } catch (Exception exception) {
-            log.error("활동 내역 갱신 실패 - event: {}, articleId: {}", "ArticleDeleted", event.articleId(), exception);
-        }
+        userActivityWriter.removeArticleViewFromAll(event.articleId());
     }
 }
