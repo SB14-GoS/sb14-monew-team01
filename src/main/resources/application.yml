@@ -17,6 +17,11 @@ spring:
     job:
       enabled: false   # 배치는 스케줄러에서 직접 실행
 
+  task:
+    scheduling:
+      pool:
+        size: 4 # 기본값 1이면 배치(기사 수집 등)가 도는 동안 활동 내역 outbox relay 같은 다른 예약 작업이 멈춘다
+
 server:
   port: 8080
 
