@@ -83,6 +83,8 @@ class UserActivityReconcilePerformanceTest {
     @DisplayName("전체 재구성·일부 유실 보정·변경 없음 소요 시간")
     void measure() {
         int users = Integer.parseInt(System.getenv().getOrDefault("PERF_RECONCILE_USERS", "10000"));
+        // 같은 컨텍스트를 쓰는 다른 테스트가 남긴 사용자도 검사 대상이 되므로 따로 센다
+        int preExisting = jdbcTemplate.queryForObject("select count(*) from users", Integer.class);
         long seedStart = System.nanoTime();
         seedPostgres(users);
         long seedMs = (System.nanoTime() - seedStart) / 1_000_000;
@@ -90,17 +92,26 @@ class UserActivityReconcilePerformanceTest {
         indexInitializer.ensureIndexes();
 
         Run rebuild = run();
-        int broken = breakDocuments();
+        List<UUID> brokenUsers = breakDocuments();
+        int broken = brokenUsers.size();
         Run repair = run();
         Run noop = run();
 
-        assertThat(rebuild.result().created()).isGreaterThanOrEqualTo(users);
+        assertThat(rebuild.result().scanned()).isEqualTo(users + preExisting);
+        assertThat(rebuild.result().created()).isEqualTo(users + preExisting);
         assertThat(repair.result().repaired()).isEqualTo(broken);
+        assertThat(repair.result().itemsAdded()).isEqualTo(broken); // 지운 댓글 복구
+        assertThat(repair.result().itemsRemoved()).isEqualTo(broken); // 가짜 본 기사 삭제
         assertThat(noop.result().repaired()).isZero();
+        UserActivityDocument repaired = repository.findById(brokenUsers.get(0)).orElseThrow();
+        assertThat(repaired.getComments()).hasSize(RECENT);
+        assertThat(repaired.getArticleViews())
+                .hasSize(RECENT)
+                .noneMatch(view -> view.articleTitle().equals("원본에 없는 기사"));
 
         PerfReport.write(REPORT, """
 
-                ## 활동 내역 정합성 보정 배치 측정 - 사용자 %,d명 (%s)
+                ## 활동 내역 정합성 보정 배치 측정 - 사용자 %,d명 + 기존 %,d명 (%s)
                 - 사용자당 구독 %d, 댓글·좋아요·본 기사 %d / 원본 시드 %,dms / 묶음 크기 %d (묶음당 원본 쿼리 6개)
                 - 일부 유실: 문서 %,d개(%.0f%%)에서 댓글 1개를 지우고 없는 본 기사 1개를 넣음
 
@@ -111,6 +122,7 @@ class UserActivityReconcilePerformanceTest {
                 %s
                 """.formatted(
                         users,
+                        preExisting,
                         Instant.now(),
                         SUBSCRIPTIONS,
                         RECENT,
@@ -130,8 +142,8 @@ class UserActivityReconcilePerformanceTest {
     }
 
     /** 일부 문서에서 댓글 하나를 빼고, 원본에 없는 본 기사를 하나 넣는다. */
-    private int breakDocuments() {
-        int broken = 0;
+    private List<UUID> breakDocuments() {
+        List<UUID> broken = new ArrayList<>();
         for (UUID userId : userIds) {
             if (random.nextDouble() >= BROKEN_RATIO) {
                 continue;
@@ -142,7 +154,7 @@ class UserActivityReconcilePerformanceTest {
                             new Document("_id", userId),
                             new Document("$pop", new Document("comments", -1))
                                     .append("$push", new Document("articleViews", fakeView(userId))));
-            broken++;
+            broken.add(userId);
         }
         return broken;
     }

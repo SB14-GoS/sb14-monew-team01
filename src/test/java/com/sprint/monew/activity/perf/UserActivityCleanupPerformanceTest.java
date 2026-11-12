@@ -6,6 +6,7 @@ import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCollection;
 import com.sprint.monew.activity.application.ActivityOutboxRelay;
 import com.sprint.monew.activity.domain.ActivityOutboxRepository;
+import com.sprint.monew.activity.domain.ActivityOutboxStatus;
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import com.sprint.monew.activity.infra.UserActivityIndexInitializer;
@@ -161,9 +162,15 @@ class UserActivityCleanupPerformanceTest {
         // 요청 스레드에서 빠진 MongoDB 작업: relay가 삭제 이벤트를 반영하는 시간
         long pending = outboxRepository.count();
         long relayStart = System.nanoTime();
-        ActivityOutboxRelay.RelayResult result = relay.relayBatch();
+        int relayed = 0;
+        ActivityOutboxRelay.RelayResult result;
+        do {
+            result = relay.relayBatch();
+            relayed += result.done();
+        } while (result.hasMore());
         double relayMs = (System.nanoTime() - relayStart) / 1_000_000.0;
-        assertThat(result.done()).isEqualTo(pending);
+        assertThat(relayed).isEqualTo(pending);
+        assertThat(outboxRepository.countByStatus(ActivityOutboxStatus.PENDING)).isZero();
         report.append("\n### relay 반영 시간 (요청 스레드 밖)\n");
         report.append("- 댓글 삭제 이벤트 %d건 / %.1fms / 건당 %.3fms\n".formatted(pending, relayMs, relayMs / pending));
 
