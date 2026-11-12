@@ -21,6 +21,9 @@ news:
     client-secret: test-client-secret
 
 monew:
+  activity:
+    outbox:
+      relay-enabled: false # 테스트는 ActivityOutboxRelay를 직접 호출한다
   storage:
     s3:
       region: ap-northeast-2

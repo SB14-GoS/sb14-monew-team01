@@ -1,9 +1,8 @@
 package com.sprint.monew.activity.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
@@ -202,64 +201,62 @@ class UserActivityProjectorTest {
     }
 
     @Test
-    @DisplayName("Writer가 실패해도 리스너는 예외를 밖으로 던지지 않는다")
-    void swallowsWriterException() {
+    @DisplayName("Writer 예외는 삼키지 않고 그대로 던진다 (relay가 재시도한다)")
+    void propagatesWriterException() {
         willThrow(new RuntimeException("mongo down")).given(writer).addArticleView(any(), any());
         ArticleViewedEvent event = new ArticleViewedEvent(
                 UUID.randomUUID(), userId, firstTime, articleId, "NAVER", "url", "제목", secondTime, "요약", 0L, 1L);
 
-        assertThatCode(() -> projector.onArticleViewed(event)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> projector.project(event)).hasMessage("mongo down");
     }
 
     @Test
-    @DisplayName("Writer가 모든 호출에서 실패해도 어떤 리스너도 예외를 밖으로 던지지 않는다")
-    void everyListenerSwallowsWriterException() {
+    @DisplayName("project는 활동 내역 이벤트 13종을 모두 Writer 호출로 보낸다")
+    void projectRoutesEveryEvent() {
         UserActivityWriter failingWriter = mock(UserActivityWriter.class, invocation -> {
-            throw new RuntimeException("mongo down");
+            throw new IllegalStateException("writer called");
         });
         UserActivityProjector failing = new UserActivityProjector(failingWriter);
         UUID interestId = UUID.randomUUID();
+        List<Object> events = List.of(
+                new ArticleViewedEvent(
+                        UUID.randomUUID(),
+                        userId,
+                        firstTime,
+                        articleId,
+                        "NAVER",
+                        "url",
+                        "제목",
+                        secondTime,
+                        "요약",
+                        0L,
+                        1L),
+                new ArticleDeleteEvent(articleId),
+                new InterestSubscribedEvent(UUID.randomUUID(), userId, interestId, "경제", List.of("주식"), 5L, firstTime),
+                new InterestUnsubscribedEvent(userId, interestId),
+                new InterestDeletedEvent(interestId),
+                new UserRegisteredEvent(userId, "user@monew.com", "닉네임", firstTime),
+                new UserNicknameUpdatedEvent(userId, "새닉네임"),
+                new UserDeletedEvent(userId),
+                new CommentCreatedEvent(commentId, articleId, "기사 제목", userId, "작성자", "댓글 내용", 0L, firstTime),
+                new CommentUpdatedEvent(commentId, userId, "수정된 내용"),
+                new CommentDeletedEvent(commentId, userId),
+                commentLikedEvent(UUID.randomUUID(), UUID.randomUUID()),
+                new CommentUnlikedEvent(commentId, UUID.randomUUID(), commentUserId, 2L));
 
-        assertThatCode(() -> {
-                    failing.onArticleViewed(new ArticleViewedEvent(
-                            UUID.randomUUID(),
-                            userId,
-                            firstTime,
-                            articleId,
-                            "NAVER",
-                            "url",
-                            "제목",
-                            secondTime,
-                            "요약",
-                            0L,
-                            1L));
-                    failing.onInterestSubscribed(new InterestSubscribedEvent(
-                            UUID.randomUUID(), userId, interestId, "경제", List.of("주식"), 5L, firstTime));
-                    failing.onInterestUnsubscribed(new InterestUnsubscribedEvent(userId, interestId));
-                    failing.onInterestDeleted(new InterestDeletedEvent(interestId));
-                    failing.onUserRegistered(new UserRegisteredEvent(userId, "user@monew.com", "닉네임", firstTime));
-                    failing.onUserNicknameUpdated(new UserNicknameUpdatedEvent(userId, "새닉네임"));
-                    failing.onUserDeleted(new UserDeletedEvent(userId));
-                    failing.onCommentCreated(new CommentCreatedEvent(
-                            commentId, articleId, "기사 제목", userId, "작성자", "댓글 내용", 0L, firstTime));
-                    failing.onCommentUpdated(new CommentUpdatedEvent(commentId, userId, "수정된 내용"));
-                    failing.onCommentDeleted(new CommentDeletedEvent(commentId, userId));
-                    failing.onCommentLiked(commentLikedEvent(UUID.randomUUID(), UUID.randomUUID()));
-                    failing.onCommentUnliked(new CommentUnlikedEvent(commentId, UUID.randomUUID(), commentUserId, 2L));
-                    failing.onArticleDeleted(new ArticleDeleteEvent(articleId));
-                })
-                .doesNotThrowAnyException();
+        assertThat(events).hasSize(ActivityEventCodec.EVENT_TYPES.size());
+        for (Object event : events) {
+            assertThatThrownBy(() -> failing.project(event))
+                    .as(event.getClass().getSimpleName())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("writer called");
+        }
     }
 
     @Test
-    @DisplayName("좋아요 추가가 실패해도 작성자 좋아요 수 갱신은 실행된다")
-    void likeCountUpdatedEvenIfAddFails() {
-        UUID likerId = UUID.randomUUID();
-        willThrow(new RuntimeException("mongo down")).given(writer).addCommentLike(any(), any());
-
-        assertThatCode(() -> projector.onCommentLiked(commentLikedEvent(UUID.randomUUID(), likerId)))
-                .doesNotThrowAnyException();
-        verify(writer).updateCommentLikeCount(eq(commentUserId), eq(commentId), anyLong());
+    @DisplayName("다루지 않는 이벤트는 IllegalArgumentException")
+    void rejectsUnknownEvent() {
+        assertThatThrownBy(() -> projector.project("unknown")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private CommentLikedEvent commentLikedEvent(UUID commentLikeId, UUID likerId) {
