@@ -10,6 +10,7 @@ import com.sprint.monew.activity.domain.UserActivityRepository;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import com.sprint.monew.article.api.ArticleViewedEvent;
 import com.sprint.monew.comment.api.CommentCreatedEvent;
+import com.sprint.monew.comment.api.CommentLikedEvent;
 import com.sprint.monew.comment.api.CommentUpdatedEvent;
 import com.sprint.monew.support.IntegrationTest;
 import java.time.Instant;
@@ -50,6 +51,9 @@ class ActivityOutboxIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    ActivityEventCodec codec;
 
     private final UUID userId = UUID.randomUUID();
 
@@ -145,6 +149,55 @@ class ActivityOutboxIntegrationTest {
         UserActivityDocument document = repository.findById(userId).orElseThrow();
         assertThat(document.getArticleViews()).hasSize(1);
         assertThat(document.getComments()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("좋아요 이벤트가 중간에 실패해 다시 반영돼도 좋아요는 하나, 좋아요 수는 정확하다")
+    void likeRetryIsIdempotent() {
+        UUID authorId = UUID.randomUUID();
+        UUID commentId = UUID.randomUUID();
+        writer.create(authorId, "author@monew.com", "작성자", Instant.now());
+        writer.addComment(
+                authorId,
+                new UserActivityDocument.CommentItem(
+                        commentId, UUID.randomUUID(), "기사", authorId, "작성자", "댓글", 0L, Instant.now()));
+        // 다른 모듈 리스너(알림 등)가 반응하지 않도록 이벤트를 발행하지 않고 outbox에 바로 넣는다
+        CommentLikedEvent event = new CommentLikedEvent(
+                UUID.randomUUID(),
+                Instant.now(),
+                userId,
+                "닉네임",
+                commentId,
+                UUID.randomUUID(),
+                "기사",
+                authorId,
+                "작성자",
+                "댓글",
+                1L,
+                Instant.now());
+        outboxRepository.save(ActivityOutbox.pending("CommentLikedEvent", codec.serialize(event), Instant.now()));
+        // 첫 쓰기(좋아요 추가)만 끝나고 두 번째 쓰기(좋아요 수) 전에 실패한 상황
+        writer.addCommentLike(
+                userId,
+                new UserActivityDocument.CommentLikeItem(
+                        event.commentLikeId(),
+                        event.likedAt(),
+                        event.commentId(),
+                        event.articleId(),
+                        event.articleTitle(),
+                        event.commentUserId(),
+                        event.commentUserNickname(),
+                        event.commentContent(),
+                        event.commentLikeCount(),
+                        event.commentCreatedAt()));
+
+        relay.relayBatch();
+
+        assertThat(repository.findById(userId).orElseThrow().getCommentLikes()).hasSize(1);
+        assertThat(repository.findById(authorId).orElseThrow().getComments())
+                .singleElement()
+                .extracting(UserActivityDocument.CommentItem::likeCount)
+                .isEqualTo(1L);
     }
 
     private ArticleViewedEvent articleViewedEvent() {

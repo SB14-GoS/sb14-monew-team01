@@ -418,6 +418,38 @@ class UserActivityMongoWriterTest {
     }
 
     @Test
+    @DisplayName("생성 시각이 같으면 항목 id 내림차순으로 10개를 남긴다 (원본 조회 정렬과 같음)")
+    void sameCreatedAtKeepsLargestIds() {
+        createUser(userId);
+        Instant sameTime = Instant.parse("2026-10-26T12:00:00Z");
+        List<UUID> ids = new ArrayList<>();
+        for (int i = 0; i < 11; i++) {
+            UUID id = UUID.randomUUID();
+            ids.add(id);
+            writer.addComment(userId, new CommentItem(id, UUID.randomUUID(), "기사", userId, "닉네임", "내용", 0L, sameTime));
+        }
+        // MongoDB·PostgreSQL 모두 UUID를 부호 없는 바이트 순서로 비교한다
+        List<UUID> expected =
+                ids.stream().sorted((a, b) -> compareUnsigned(b, a)).limit(10).toList();
+
+        assertThat(find(userId).getComments())
+                .extracting(CommentItem::commentId)
+                .containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    @DisplayName("같은 댓글의 좋아요는 id가 달라도 하나만 남는다 (취소 이벤트가 유실된 뒤 다시 좋아요)")
+    void oneLikePerComment() {
+        createUser(userId);
+        UUID commentId = UUID.randomUUID();
+
+        writer.addCommentLike(userId, commentLike(UUID.randomUUID(), commentId));
+        writer.addCommentLike(userId, commentLike(UUID.randomUUID(), commentId));
+
+        assertThat(find(userId).getCommentLikes()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("좋아요 수는 저장된 버전보다 새 이벤트일 때만 바뀐다")
     void likeCountIgnoresOlderVersion() {
         createUser(userId);
@@ -485,5 +517,10 @@ class UserActivityMongoWriterTest {
                 "요약",
                 0L,
                 1L);
+    }
+
+    private static int compareUnsigned(UUID a, UUID b) {
+        int high = Long.compareUnsigned(a.getMostSignificantBits(), b.getMostSignificantBits());
+        return high != 0 ? high : Long.compareUnsigned(a.getLeastSignificantBits(), b.getLeastSignificantBits());
     }
 }

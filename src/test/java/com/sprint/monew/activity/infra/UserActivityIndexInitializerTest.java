@@ -63,14 +63,28 @@ class UserActivityIndexInitializerTest {
     @FieldSource("FIELDS")
     @DisplayName("정리 쿼리 필터가 전체 스캔 대신 인덱스를 탄다")
     void usesIndex(String field) {
-        mongoTemplate.getCollection("user_activities").insertOne(new Document("_id", UUID.randomUUID()));
+        // 배열 원소가 있는 문서를 넣어 multikey 인덱스로 실제 원소를 찾는지 본다
+        String array = field.substring(0, field.indexOf('.'));
+        String key = field.substring(field.indexOf('.') + 1);
+        UUID target = UUID.randomUUID();
+        for (int i = 0; i < 20; i++) {
+            UUID value = i == 7 ? target : UUID.randomUUID();
+            mongoTemplate
+                    .getCollection("user_activities")
+                    .insertOne(new Document("_id", UUID.randomUUID())
+                            .append(array, List.of(new Document(key, value), new Document(key, UUID.randomUUID()))));
+        }
 
         Document explain = mongoTemplate
                 .getCollection("user_activities")
-                .find(new Document(field, UUID.randomUUID()))
-                .explain(ExplainVerbosity.QUERY_PLANNER);
+                .find(new Document(field, target))
+                .explain(ExplainVerbosity.EXECUTION_STATS);
+        Document stats = explain.get("executionStats", Document.class);
 
         assertThat(explain.toJson()).contains("IXSCAN").doesNotContain("COLLSCAN");
+        assertThat(explain.toJson()).contains("\"isMultiKey\": true");
+        assertThat(stats.get("nReturned", Number.class).intValue()).isEqualTo(1);
+        assertThat(stats.get("totalDocsExamined", Number.class).intValue()).isEqualTo(1);
     }
 
     private List<String> indexNames() {
