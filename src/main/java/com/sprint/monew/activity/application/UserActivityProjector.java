@@ -32,7 +32,10 @@ public class UserActivityProjector {
 
     private final UserActivityWriter userActivityWriter;
 
-    public void project(Object event) {
+    /**
+     * @param sequence 이벤트 순번 (outbox id). 값을 덮어쓰는 갱신(좋아요 수)의 버전으로 쓴다.
+     */
+    public void project(Object event, long sequence) {
         if (event instanceof ArticleViewedEvent e) {
             onArticleViewed(e);
         } else if (event instanceof ArticleDeleteEvent e) {
@@ -56,9 +59,9 @@ public class UserActivityProjector {
         } else if (event instanceof CommentDeletedEvent e) {
             onCommentDeleted(e);
         } else if (event instanceof CommentLikedEvent e) {
-            onCommentLiked(e);
+            onCommentLiked(e, sequence);
         } else if (event instanceof CommentUnlikedEvent e) {
-            onCommentUnliked(e);
+            onCommentUnliked(e, sequence);
         } else {
             throw new IllegalArgumentException(
                     "활동 내역이 다루지 않는 이벤트: " + event.getClass().getName());
@@ -138,7 +141,7 @@ public class UserActivityProjector {
         userActivityWriter.removeCommentLikeFromAll(event.commentId());
     }
 
-    public void onCommentLiked(CommentLikedEvent event) {
+    public void onCommentLiked(CommentLikedEvent event, long sequence) {
         userActivityWriter.addCommentLike(
                 event.likerId(),
                 new CommentLikeItem(
@@ -152,12 +155,14 @@ public class UserActivityProjector {
                         event.commentContent(),
                         event.commentLikeCount(),
                         event.commentCreatedAt()));
-        userActivityWriter.updateCommentLikeCount(event.commentUserId(), event.commentId(), event.commentLikeCount());
+        userActivityWriter.updateCommentLikeCount(
+                event.commentUserId(), event.commentId(), event.commentLikeCount(), sequence);
     }
 
-    public void onCommentUnliked(CommentUnlikedEvent event) {
+    public void onCommentUnliked(CommentUnlikedEvent event, long sequence) {
         userActivityWriter.removeCommentLike(event.likerId(), event.commentId());
-        userActivityWriter.updateCommentLikeCount(event.commentUserId(), event.commentId(), event.commentLikeCount());
+        userActivityWriter.updateCommentLikeCount(
+                event.commentUserId(), event.commentId(), event.commentLikeCount(), sequence);
     }
 
     public void onArticleDeleted(ArticleDeleteEvent event) {

@@ -33,7 +33,10 @@ public interface UserActivityWriter {
 
     void removeCommentLike(UUID likerId, UUID commentId);
 
-    void updateCommentLikeCount(UUID commentUserId, UUID commentId, long likeCount);
+    /**
+     * @param version 이벤트 순번 (outbox id). 저장된 버전보다 클 때만 반영해 순서가 뒤바뀐 이벤트가 최신 값을 덮지 않게 한다.
+     */
+    void updateCommentLikeCount(UUID commentUserId, UUID commentId, long likeCount, long version);
 
     void removeCommentLikeFromAll(UUID commentId);
 
