@@ -1,10 +1,12 @@
 package com.sprint.monew.activity.infra;
 
+import com.mongodb.client.result.UpdateResult;
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityDocument.ArticleViewItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentLikeItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.SubscriptionItem;
+import com.sprint.monew.activity.domain.UserActivitySource;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +41,20 @@ public class UserActivityMongoWriter implements UserActivityWriter {
                 .setOnInsert("commentLikes", List.of())
                 .setOnInsert("articleViews", List.of());
         mongoTemplate.upsert(byUser(userId), update, UserActivityDocument.class);
+    }
+
+    @Override
+    public boolean restore(UserActivitySource source) {
+        Update update = new Update()
+                .setOnInsert("email", source.email())
+                .setOnInsert("nickname", source.nickname())
+                .setOnInsert("createdAt", source.createdAt())
+                .setOnInsert("subscriptions", source.subscriptions())
+                .setOnInsert("comments", source.comments())
+                .setOnInsert("commentLikes", source.commentLikes())
+                .setOnInsert("articleViews", source.articleViews());
+        UpdateResult result = mongoTemplate.upsert(byUser(source.userId()), update, UserActivityDocument.class);
+        return result.getUpsertedId() != null;
     }
 
     @Override
@@ -132,6 +148,12 @@ public class UserActivityMongoWriter implements UserActivityWriter {
         Query query = Query.query(Criteria.where("commentLikes.commentId").is(commentId));
         Update update = new Update().pull("commentLikes", new Document("commentId", commentId));
         mongoTemplate.updateMulti(query, update, UserActivityDocument.class);
+    }
+
+    @Override
+    public void removeArticleView(UUID userId, UUID articleViewId) {
+        Update update = new Update().pull("articleViews", new Document("articleViewId", articleViewId));
+        mongoTemplate.updateFirst(byUser(userId), update, UserActivityDocument.class);
     }
 
     @Override
