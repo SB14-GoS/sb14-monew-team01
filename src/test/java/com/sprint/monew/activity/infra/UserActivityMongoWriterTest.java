@@ -8,6 +8,7 @@ import com.sprint.monew.activity.domain.UserActivityDocument.CommentItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.CommentLikeItem;
 import com.sprint.monew.activity.domain.UserActivityDocument.SubscriptionItem;
 import com.sprint.monew.activity.domain.UserActivityRepository;
+import com.sprint.monew.activity.domain.UserActivitySource;
 import com.sprint.monew.activity.domain.UserActivityWriter;
 import com.sprint.monew.support.IntegrationTest;
 import java.time.Instant;
@@ -387,6 +388,33 @@ class UserActivityMongoWriterTest {
                 .hasSize(10)
                 .extracting(CommentItem::commentId)
                 .doesNotContain(stale.commentId());
+    }
+
+    @Test
+    @DisplayName("원본으로 만든 문서를 한 번에 넣고, 이미 있으면 건드리지 않는다")
+    void restore() {
+        CommentItem comment = comment(UUID.randomUUID(), userId);
+        UserActivitySource source = new UserActivitySource(
+                userId,
+                "user@monew.com",
+                "닉네임",
+                Instant.parse("2026-10-26T00:00:00Z"),
+                List.of(subscription(UUID.randomUUID())),
+                List.of(comment),
+                List.of(),
+                List.of(articleView(UUID.randomUUID())));
+
+        boolean inserted = writer.restore(source);
+        boolean again = writer.restore(new UserActivitySource(
+                userId, "other@monew.com", "다른닉네임", Instant.now(), List.of(), List.of(), List.of(), List.of()));
+
+        UserActivityDocument document = find(userId);
+        assertThat(inserted).isTrue();
+        assertThat(again).isFalse();
+        assertThat(document.getNickname()).isEqualTo("닉네임");
+        assertThat(document.getComments()).containsExactly(comment);
+        assertThat(document.getSubscriptions()).hasSize(1);
+        assertThat(document.getArticleViews()).hasSize(1);
     }
 
     @Test
