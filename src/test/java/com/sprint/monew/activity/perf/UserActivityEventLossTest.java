@@ -5,6 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 
+import com.sprint.monew.activity.application.ActivityOutboxRelay;
+import com.sprint.monew.activity.domain.ActivityOutbox;
+import com.sprint.monew.activity.domain.ActivityOutboxRepository;
+import com.sprint.monew.activity.domain.ActivityOutboxStatus;
 import com.sprint.monew.activity.domain.UserActivityDocument;
 import com.sprint.monew.activity.domain.UserActivityRepository;
 import com.sprint.monew.activity.domain.UserActivityWriter;
@@ -28,22 +32,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
- * #198 기준 측정: MongoDB 장애 중에 일어난 활동이 활동 내역에서 얼마나 사라지는지 센다.
+ * #198: MongoDB 장애 중에 일어난 활동이 활동 내역에서 사라지지 않는지 센다.
  *
  * <p>Writer를 spy로 감싸 장애 구간 동안 MongoDB 예외를 던지게 한다. 원본(PostgreSQL)은 커밋되므로, 원본과 활동 내역 문서를 비교해 빠진 항목을 유실로 센다.
+ * 장애 구간에도 relay를 몇 번 돌려(스케줄러 실행 흉내) 재시도가 쌓이게 하고, 복구 후 relay가 outbox를 모두 비우면 유실이 0이어야 한다.
+ * 재시도 대기 시간은 0으로 둬 복구 직후 바로 반영되게 한다.
  *
- * <pre>{@code PERF=true ./gradlew test --tests '*UserActivityEventLossBaselineTest'}</pre>
+ * <pre>{@code PERF=true ./gradlew test --tests '*UserActivityEventLossTest'}</pre>
  */
 @Tag("performance")
 @IntegrationTest
 @EnabledIfEnvironmentVariable(named = "PERF", matches = "true")
-class UserActivityEventLossBaselineTest {
+@TestPropertySource(properties = "monew.activity.outbox.base-backoff=0ms")
+class UserActivityEventLossTest {
 
     private static final String REPORT = "activity-event-loss";
     private static final int USERS = 100;
+    private static final int OUTAGE_TICKS = 5;
     private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
     @MockitoSpyBean
@@ -59,6 +68,12 @@ class UserActivityEventLossBaselineTest {
     UserActivityRepository repository;
 
     @Autowired
+    ActivityOutboxRelay relay;
+
+    @Autowired
+    ActivityOutboxRepository outboxRepository;
+
+    @Autowired
     MongoTemplate mongoTemplate;
 
     @Autowired
@@ -71,6 +86,7 @@ class UserActivityEventLossBaselineTest {
     @AfterEach
     void tearDown() {
         reset(writer);
+        outboxRepository.deleteAll();
         mongoTemplate.dropCollection(UserActivityDocument.class);
         for (UUID userId : userIds) {
             jdbcTemplate.update("delete from comments where user_id = ?", userId);
@@ -83,8 +99,9 @@ class UserActivityEventLossBaselineTest {
     }
 
     @Test
-    @DisplayName("MongoDB 장애 구간의 활동은 원본에만 남고 활동 내역에서 유실된다")
+    @DisplayName("MongoDB 장애 구간의 활동도 복구 후 relay가 모두 반영한다")
     void measureLossDuringOutage() {
+        outboxRepository.deleteAll();
         UUID outageArticle = insertArticle(0);
         UUID recoveredArticle = insertArticle(1);
         for (int i = 0; i < USERS; i++) {
@@ -97,10 +114,25 @@ class UserActivityEventLossBaselineTest {
         doThrow(outage).when(writer).addComment(any(), any());
         doThrow(outage).when(writer).addArticleView(any(), any());
         int apiFailures = runActivities(outageArticle);
+        int blockedTicks = 0;
+        for (int i = 0; i < OUTAGE_TICKS; i++) {
+            if (relay.relayBatch().blocked()) {
+                blockedTicks++;
+            }
+        }
+        long pendingAfterOutage = outboxRepository.countByStatus(ActivityOutboxStatus.PENDING);
+        int headAttempts = outboxRepository.findAll().stream()
+                .mapToInt(ActivityOutbox::getAttempts)
+                .max()
+                .orElse(0);
 
-        // 복구 후: 같은 활동을 한 번 더 한다
+        // 복구 후: 같은 활동을 한 번 더 하고 relay로 outbox를 비운다
         reset(writer);
         apiFailures += runActivities(recoveredArticle);
+        long pendingBeforeDrain = outboxRepository.countByStatus(ActivityOutboxStatus.PENDING);
+        long drainStart = System.nanoTime();
+        int relayed = drain();
+        double drainMs = (System.nanoTime() - drainStart) / 1_000_000.0;
 
         Result comments = compare(
                 "select id from comments where user_id = ? and deleted_at is null",
@@ -115,19 +147,47 @@ class UserActivityEventLossBaselineTest {
 
         assertThat(comments.source()).isEqualTo(USERS * 2);
         assertThat(views.source()).isEqualTo(USERS * 2);
+        assertThat(outboxRepository.countByStatus(ActivityOutboxStatus.PENDING)).isZero();
+        assertThat(outboxRepository.countByStatus(ActivityOutboxStatus.DEAD)).isZero();
+        assertThat(comments.lost()).isZero();
+        assertThat(views.lost()).isZero();
 
-        PerfReport.write(
-                REPORT, """
+        PerfReport.write(REPORT, """
 
-                ## MongoDB 장애 중 활동 내역 유실 기준 측정 (%s)
+                ## MongoDB 장애 중 활동 내역 유실 측정 - Transactional Outbox (%s)
                 - 사용자 %d명이 장애 구간과 복구 후에 각각 댓글 1건 작성 + 기사 1건 조회
-                - API 실패: %d건 (리스너가 예외를 삼켜 요청은 성공)
+                - API 실패: %d건
+                - 장애 중 relay %d회 실행, 막힘 %d회 / 맨 앞 이벤트 시도 %d회 / 장애 직후 PENDING %d건
+                - 복구 후 PENDING %d건 → relay가 %d건 반영 (%.1fms, 건당 %.3fms)
 
                 | 항목 | 원본(PostgreSQL) | 활동 내역(MongoDB) | 유실 | 유실률 |
                 | --- | --- | --- | --- | --- |
                 %s
                 %s
-                """.formatted(Instant.now(), USERS, apiFailures, comments.toRow("댓글"), views.toRow("본 기사")));
+                """.formatted(
+                        Instant.now(),
+                        USERS,
+                        apiFailures,
+                        OUTAGE_TICKS,
+                        blockedTicks,
+                        headAttempts,
+                        pendingAfterOutage,
+                        pendingBeforeDrain,
+                        relayed,
+                        drainMs,
+                        relayed == 0 ? 0 : drainMs / relayed,
+                        comments.toRow("댓글"),
+                        views.toRow("본 기사")));
+    }
+
+    private int drain() {
+        int relayed = 0;
+        ActivityOutboxRelay.RelayResult result;
+        do {
+            result = relay.relayBatch();
+            relayed += result.done();
+        } while (result.hasMore() || (!result.blocked() && result.done() > 0));
+        return relayed;
     }
 
     private int runActivities(UUID articleId) {
