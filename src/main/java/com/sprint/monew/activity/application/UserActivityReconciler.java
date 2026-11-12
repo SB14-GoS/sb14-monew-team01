@@ -37,27 +37,56 @@ import org.springframework.stereotype.Component;
 public class UserActivityReconciler {
 
     static final int CHUNK_SIZE = 500;
-    private static final UUID MIN_ID = new UUID(0L, 0L);
+    /** 첫 묶음의 시작 위치 (가장 작은 UUID) */
+    public static final UUID MIN_ID = new UUID(0L, 0L);
 
     private final UserActivitySourceReader sourceReader;
     private final UserActivityRepository repository;
     private final UserActivityWriter writer;
 
-    /** 사용자 전체를 묶음 단위로 보정하고, 사용자가 사라진 문서를 지운다. */
+    /** 사용자 전체를 묶음 단위로 보정하고, 사용자가 사라진 문서를 지운다. 배치는 묶음마다 끊어 실행한다({@link UserActivityReconcileTasklet}). */
     public ReconcileResult reconcileAll() {
         ReconcileResult total = ReconcileResult.empty();
-        UUID after = MIN_ID;
-        while (true) {
-            List<UUID> userIds = sourceReader.findUserIdsAfter(after, CHUNK_SIZE);
-            if (userIds.isEmpty()) {
-                break;
-            }
-            total = total.plus(reconcile(userIds));
-            after = userIds.get(userIds.size() - 1);
+        ChunkResult chunk = new ChunkResult(MIN_ID, ReconcileResult.empty());
+        while (chunk.hasNext()) {
+            chunk = reconcileUsersAfter(chunk.nextAfter());
+            total = total.plus(chunk.result());
         }
-        total = total.plus(removeOrphans());
+        chunk = new ChunkResult(MIN_ID, ReconcileResult.empty());
+        while (chunk.hasNext()) {
+            chunk = removeOrphansAfter(chunk.nextAfter());
+            total = total.plus(chunk.result());
+        }
         log.info("활동 내역 정합성 보정 완료 - {}", total);
         return total;
+    }
+
+    /** after 다음 사용자 한 묶음을 보정한다. 남은 사용자가 없으면 {@link ChunkResult#hasNext()}가 false다. */
+    public ChunkResult reconcileUsersAfter(UUID after) {
+        List<UUID> userIds = sourceReader.findUserIdsAfter(after, CHUNK_SIZE);
+        if (userIds.isEmpty()) {
+            return ChunkResult.done();
+        }
+        return new ChunkResult(userIds.get(userIds.size() - 1), reconcile(userIds));
+    }
+
+    /** after 다음 MongoDB 문서 한 묶음에서 사용자가 사라진 문서를 지운다. */
+    public ChunkResult removeOrphansAfter(UUID after) {
+        List<UUID> ids = repository.findIdsAfter(after, Limit.of(CHUNK_SIZE)).stream()
+                .map(UserActivityDocument::getId)
+                .toList();
+        if (ids.isEmpty()) {
+            return ChunkResult.done();
+        }
+        Set<UUID> existing = sourceReader.findExistingUserIds(ids);
+        int removed = 0;
+        for (UUID id : ids) {
+            if (!existing.contains(id)) {
+                writer.delete(id);
+                removed++;
+            }
+        }
+        return new ChunkResult(ids.get(ids.size() - 1), new ReconcileResult(0, 0, 0, 0, 0, removed));
     }
 
     public ReconcileResult reconcile(List<UUID> userIds) {
@@ -157,28 +186,6 @@ public class UserActivityReconciler {
         }
     }
 
-    private ReconcileResult removeOrphans() {
-        int removed = 0;
-        UUID after = MIN_ID;
-        while (true) {
-            List<UUID> ids = repository.findIdsAfter(after, Limit.of(CHUNK_SIZE)).stream()
-                    .map(UserActivityDocument::getId)
-                    .toList();
-            if (ids.isEmpty()) {
-                break;
-            }
-            Set<UUID> existing = sourceReader.findExistingUserIds(ids);
-            for (UUID id : ids) {
-                if (!existing.contains(id)) {
-                    writer.delete(id);
-                    removed++;
-                }
-            }
-            after = ids.get(ids.size() - 1);
-        }
-        return new ReconcileResult(0, 0, 0, 0, 0, removed);
-    }
-
     private static final class Changes {
         private int added;
         private int removed;
@@ -186,6 +193,21 @@ public class UserActivityReconciler {
 
         private boolean any() {
             return added > 0 || removed > 0 || fields > 0;
+        }
+    }
+
+    /**
+     * @param nextAfter 다음 묶음의 시작 위치, 끝났으면 null
+     * @param result 이 묶음의 결과
+     */
+    public record ChunkResult(UUID nextAfter, ReconcileResult result) {
+
+        static ChunkResult done() {
+            return new ChunkResult(null, ReconcileResult.empty());
+        }
+
+        public boolean hasNext() {
+            return nextAfter != null;
         }
     }
 
@@ -200,11 +222,11 @@ public class UserActivityReconciler {
     public record ReconcileResult(
             int scanned, int repaired, int created, int itemsAdded, int itemsRemoved, int orphansRemoved) {
 
-        static ReconcileResult empty() {
+        public static ReconcileResult empty() {
             return new ReconcileResult(0, 0, 0, 0, 0, 0);
         }
 
-        ReconcileResult plus(ReconcileResult other) {
+        public ReconcileResult plus(ReconcileResult other) {
             return new ReconcileResult(
                     scanned + other.scanned,
                     repaired + other.repaired,
